@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security guidance
+    url: https://github.com/Huuyii-sleeping/open-continuity/blob/main/SECURITY.md
+    about: Review the private-data rules before reporting a security issue.

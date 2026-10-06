@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible OpenContinuity defect using fictional data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, private memory exports, real conversations, or internal logs.
+  - type: input
+    id: version
+    attributes:
+      label: OpenContinuity version
+      placeholder: 1.1.0-beta.1
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Profile
+      options: [Lite, Team, Development or test, Unknown]
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node.js version, and Agent client/version when applicable.
+      placeholder: macOS; Node.js 24; Agent client and version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use obviously fictional data and include exact commands or tool calls.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Sanitized doctor output
+      description: Remove paths, identifiers, and other private information before posting.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety checks
+      options:
+        - label: I used fictional or authorized data and removed secrets and personal information.
+          required: true
+        - label: I checked whether the MCP tool was unavailable, errored, or simply not selected by the Agent.

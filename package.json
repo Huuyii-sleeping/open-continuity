@@ -1,0 +1,81 @@
+{
+  "name": "open-continuity",
+  "version": "1.1.0-beta.1",
+  "description": "A local-first, user-controlled shared memory and handoff layer for MCP agents.",
+  "keywords": [
+    "agent",
+    "ai-memory",
+    "handoff",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "author": {
+    "name": "Huuyii-sleeping",
+    "url": "https://github.com/Huuyii-sleeping"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Huuyii-sleeping/open-continuity.git"
+  },
+  "homepage": "https://github.com/Huuyii-sleeping/open-continuity#readme",
+  "bugs": {
+    "url": "https://github.com/Huuyii-sleeping/open-continuity/issues"
+  },
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "bin": {
+    "open-continuity": "dist/src/cli.js"
+  },
+  "files": [
+    "dist/src",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SUPPORT.md",
+    "SECURITY.md",
+    "docs"
+  ],
+  "scripts": {
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/add-cli-shebang.mjs",
+    "pretest": "npm run build",
+    "smoke:demo": "npm run build && node dist/src/cli.js demo",
+    "smoke:package": "node scripts/package-smoke.mjs",
+    "release:check": "npm run typecheck && npm test && npm audit --omit=dev --registry https://registry.npmjs.org && npm pack --dry-run && npm run smoke:package",
+    "dev": "tsx src/server.ts",
+    "dev:mcp": "tsx src/server.ts --mcp",
+    "start": "node dist/src/server.js",
+    "start:mcp": "node dist/src/server.js --mcp",
+    "db:migrate": "tsx src/postgres/migrate.ts",
+    "db:migrate:postgres": "tsx src/postgres/migrate.ts",
+    "db:migrate:sqlite": "tsx src/sqlite/migrate.ts",
+    "data:import-json": "tsx src/sqlite/data-cli.ts import-json",
+    "data:export-json": "tsx src/sqlite/data-cli.ts export-json",
+    "benchmark:lite": "tsx benchmarks/lite.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "fastify": "^5.6.1",
+    "pg": "^8.23.0",
+    "zod": "^4.6.5"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.23.1",
+    "pg-mem": "^2.9.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.log
+*.tgz
+.DS_Store
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.bak
+benchmark-results/
