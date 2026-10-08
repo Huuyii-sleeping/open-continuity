@@ -62,7 +62,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "fastify": "^5.6.1",
     "pg": "^8.23.0",
     "zod": "^4.6.5"
