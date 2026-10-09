@@ -20,6 +20,8 @@ npm run release:check
 
 The gate performs TypeScript checking, the complete automated test suite, a production dependency audit against the public npm registry, a package-content dry run, and an isolated install from the generated tarball followed by the two-Agent MCP demo.
 
+The complete suite must include `test/trae-adapter-blackbox.test.ts`, which runs the fictional process boundary from idempotent `setup trae` through app-server Capture, candidate approval, the installed Hook executable, and real MCP stdio discovery/recall. It must not read the user's Trae history.
+
 Also run a release-sized local performance sample and preserve its raw JSON with the release evidence:
 
 ```bash
@@ -72,6 +74,9 @@ Do not connect a user's real Agent configuration during release verification unl
 Before announcing the preview, capture only fictional demo output and report the limits prominently:
 
 - MCP tool availability does not guarantee that a third-party Agent will call the tools automatically.
-- OpenContinuity does not intercept or export complete third-party conversations.
-- Trae has a real MCP end-to-end test; Claude Code and Codex still need environment-dependent product smoke tests.
-- Enterprise, semantic vector retrieval, model-based extraction, and graph reasoning are roadmap items, not current capabilities.
+- MCP alone does not expose a client's complete conversation. Experimental Trae Capture reads only app-server-visible content after an explicit sync and stages it locally.
+- Trae Injection is opt-in and workspace-scoped; it reads only approved public memory through a bounded `UserPromptSubmit` hook, records a Prompt fingerprint rather than the Prompt body, and fails open on timeout or storage errors.
+- The capture watch command remains an interruptible foreground polling loop; on macOS, `setup trae` installs/reloads an optional per-user launchd service. Verify the generated plist contains the detected Trae executable directory in its bounded PATH allowlist, then verify pagination bounds, transactional thread/turn/item checkpoints, the single-instance lock, retry behavior, persisted sync status, and service logs. Verify `doctor trae` reports Hook/MCP manual approval boundaries instead of enabling a global bypass.
+- Trae has real MCP and directed capture end-to-end tests; Claude Code and Codex still need environment-dependent product smoke tests and do not have capture adapters.
+- The Trae vertical adapter test covers a fictional app-server thread through Capture, candidate approval, light UserPromptSubmit injection, and explicit MCP multi-step retrieval. A separate read-only probe against the installed Trae executable verifies app-server initialization and visible-thread normalization without writing the user's real conversation into the test database.
+- Enterprise, semantic vector retrieval, model-based extraction, candidate conflict resolution, and graph reasoning are roadmap items; deterministic sensitive-field redaction and Inbox retention are current Lite capabilities.

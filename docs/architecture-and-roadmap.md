@@ -44,12 +44,15 @@ RAG、Agentic Retrieval、多路召回和图谱只是 Read Pipeline 的可插拔
 - Profile 级步骤、超时、子查询和历史事件预算，以及显式确定性降级原因。
 - 幂等写入、分页游标、来源 Agent、版本与用户确认标记。
 - PostgreSQL 迁移、并发初始化锁、事务更新和遗忘。
+- 实验性 Trae Conversation Capture：app-server 同步与 `watch` 轮询、基于 `updatedAt` 的增量读取、统一回合/消息模型、独立 SQLite Inbox、规则候选提取、敏感字段脱敏/阻断、7 天保留清理和人工 approve/reject。
+- 实验性 Trae Injection Adapter：`UserPromptSubmit` command hook、一键安装/检查与备份、workspace allowlist、已批准 public 记忆的轻量 Context Pack、200ms 超时、fail-open 和不含 Prompt 原文的本地 Receipt。
+- Trae Adapter 成熟化基础：幂等 `setup trae`、分层 `doctor trae`、可安全重载的 launchd 生命周期，以及与 Inbox 同事务推进的 thread/turn/item checkpoint。
 
 ### 尚未实现
 
 - embedding、pgvector、语义向量召回和 rerank。
 - 基于模型的语义查询规划、知识图谱和关系多跳推理。
-- 记忆自动提取、语义冲突判断、条件化偏好归并和归并撤销。
+- 基于模型的记忆提取、语义冲突判断、条件化偏好归并和归并撤销；当前仅有 Trae Capture 的显式信号规则提取。
 - 基于模型的语义压缩与特定模型 tokenizer 精确计数。
 - 多租户、OAuth、管理后台和企业级策略引擎。
 
@@ -132,6 +135,39 @@ SQLite / PostgreSQL / optional vector and graph indexes
 
 (*) 后续版本能力
 ```
+
+Trae Capture 在统一协议之前增加一层可撤销的本地暂存：
+
+```text
+Trae saved thread --app-server Capture--> Conversation Inbox (capture.db)
+                                      | normalize + quality gate
+                                      v
+                                pending candidates
+                                      | explicit approve
+                                      v
+                             Write Pipeline (memories.db)
+```
+
+Trae Injection 是反方向的轻量读路径：
+
+```text
+Trae UserPromptSubmit
+        |
+        v
+workspace allowlist + local config
+        |
+        v
+public + user-confirmed memory_context
+        |  <= 800 estimated tokens / <= 8 memories / <= 200 ms
+        v
+additionalContext (untrusted reference data)
+        |
+        +--> Injection Receipt (prompt fingerprint only)
+```
+
+Injection 不承担深度检索、模型推理或长期对话保存。Agent 需要更多证据时，仍通过 MCP `memory_recall` / `memory_context` / `memory_query` 主动查询；Hook 失败、超时或未命中都返回继续执行的空动作。
+
+Inbox 保存“用于判断什么值得沉淀的可观测证据”，长期记忆只保存用户批准后的结构化结果。两层隔离避免把“工具看见过某段对话”等同于“这段对话已经成为共享记忆”。
 
 三个 Profile 必须复用同一个 Protocol、Write/Read Pipeline 接口和结果模型。Profile 只决定启用哪些存储适配器、检索通道与预算策略，不能复制三套互相漂移的业务逻辑。
 
@@ -257,11 +293,21 @@ memory-package/
 - Memory Package 合并策略、签名和兼容性版本演进。
 - 完成 Lite、Team、Enterprise 的能力协商与治理边界。
 
+### V1.2 前置实验：Conversation Capture 与 Injection（已实现 Trae 基础闭环）
+
+- Trae app-server capability probe、显式 thread 同步和基于 `updatedAt` + durable checkpoint 的 `watch`。
+- user、assistant、tool、compaction 的统一可观测事件模型。
+- completed/final-answer 完整性判断，临时 side thread 过滤和重复同步幂等。
+- 规则型显式信号提取，候选默认 private/pending；普通批准保留 private，只有显式 `--share` 才成为默认跨 Agent 可读的 public 记忆。
+- UserPromptSubmit 注入已实现基础版本：workspace 显式开启、public + userConfirmed 过滤、受限 Context Pack、超时与 fail-open、Receipt 审计。
+- `setup trae` 已聚合 MCP、Hook、workspace allowlist 与 macOS launchd Capture；`doctor trae` 分层报告运行状态和必须人工确认的 Hook 信任/MCP 审批边界。
+- 尚缺模型语义提取、候选合并与冲突处理、质量评分，以及面向 Claude/Codex 的独立 Capture/Injection Adapter。非 macOS 平台当前仍需以前台 `watch` 或用户自己的进程管理器运行。
+
 版本号表达能力成熟度，不代表每个部署都必须启用全部组件。Lite 在 V1.1 仍保持单机、低成本和可离线运行。
 
 ## 8. 当前非目标
 
-- 不承诺仅靠 MCP 自动获得 Agent 的完整对话。
+- 不承诺仅靠 MCP 自动获得 Agent 的完整对话；Trae Capture 依赖其本机 app-server 扩展面。
 - 不要求使用者修改第三方闭源 Agent 的源码。
 - 不在个人版默认启用外部 embedding 或推理服务。
 - 不为了展示技术而强制引入独立向量数据库、图数据库、消息队列或微服务。

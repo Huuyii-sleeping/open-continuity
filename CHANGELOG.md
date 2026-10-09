@@ -8,6 +8,12 @@ All notable changes to OpenContinuity are documented here. The project follows S
 
 - Public Beta governance, support, and contribution templates.
 - Reproducible Lite benchmark tooling and SQLite maintenance commands.
+- Experimental Trae Conversation Capture with app-server capability probing, normalized local Inbox, explicit-signal candidate extraction, and approve/reject workflow.
+- Experimental Trae `UserPromptSubmit` Injection Adapter with workspace opt-in, bounded public-memory Context Pack injection, fail-open behavior, and privacy-preserving receipts.
+- Incremental Trae Capture watch mode, Inbox retention cleanup, sensitive-field redaction with candidate blocking, and backed-up Hook install/check commands.
+- Fictional Golden Dataset evaluation for Capture/Injection quality, security leakage, and latency metrics.
+- Multi-round `suite-v1` assessment with 185 independent assertions across Capture, Injection, Inbox governance, and fail-open behavior.
+- Idempotent `setup trae`, layered `doctor trae`, transactional per-thread Capture checkpoints, install-path refresh, cross-platform launchd fallback reporting, safer service lifecycle handling, and a process-level fictional Trae Adapter black-box test.
 
 ## [1.1.0-beta.1]
 
