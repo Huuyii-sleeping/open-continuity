@@ -1,0 +1,55 @@
+{
+  "version": "suite-v1",
+  "description": "Fictional multi-round assessment suite for Trae Capture, Inbox governance, and Injection safety.",
+  "rounds": 5,
+  "thresholds": {
+    "captureCasePassRate": 1,
+    "injectionCasePassRate": 1,
+    "governanceCasePassRate": 1,
+    "securityLeakageRate": 0,
+    "maxInjectionP95Ms": 200
+  },
+  "capture": [
+    {"id": "zh-preference", "type": "user_message", "text": "我偏好先给结论，再列出验证结果。", "quality": "complete", "expected": [{"kind": "user_preference", "value": "先给结论，再列出验证结果"}]},
+    {"id": "zh-hope", "type": "user_message", "text": "我更希望使用虚构示例。", "quality": "complete", "expected": [{"kind": "user_preference", "value": "使用虚构示例"}]},
+    {"id": "zh-future", "type": "user_message", "text": "以后请使用虚构示例。", "quality": "complete", "expected": [{"kind": "user_preference", "value": "使用虚构示例"}]},
+    {"id": "zh-dislike", "type": "user_message", "text": "我不喜欢冗长的开场。", "quality": "complete", "expected": [{"kind": "user_preference", "value": "冗长的开场"}]},
+    {"id": "zh-fact", "type": "user_message", "text": "请记住虚构项目代号是蓝色纸飞机。", "quality": "complete", "expected": [{"kind": "user_fact", "value": "虚构项目代号是蓝色纸飞机"}]},
+    {"id": "zh-decision", "type": "user_message", "text": "我们决定以后先运行类型检查，再运行完整测试。", "quality": "complete", "expected": [{"kind": "decision", "value": "先运行类型检查，再运行完整测试"}]},
+    {"id": "en-preference", "type": "user_message", "text": "I prefer concise fictional summaries.", "quality": "complete", "expected": [{"kind": "user_preference", "value": "concise fictional summaries"}]},
+    {"id": "en-remember", "type": "user_message", "text": "Please remember that the fictional project uses amber markers.", "quality": "complete", "expected": [{"kind": "user_fact", "value": "that the fictional project uses amber markers"}]},
+    {"id": "partial-preference", "type": "user_message", "text": "以后请使用虚构示例。", "quality": "partial", "expected": [{"kind": "user_preference", "value": "使用虚构示例", "maxConfidence": 0.6}]},
+    {"id": "interrupted-decision", "type": "user_message", "text": "我们决定以后先运行类型检查。", "quality": "interrupted", "expected": [{"kind": "decision", "value": "先运行类型检查", "maxConfidence": 0.6}]},
+    {"id": "ordinary-question", "type": "user_message", "text": "请解释一下虚构模块的工作方式。", "quality": "complete", "expected": []},
+    {"id": "assistant-claim", "type": "assistant_message", "text": "我偏好先给结论，再列出验证结果。", "quality": "complete", "expected": []},
+    {"id": "empty-message", "type": "user_message", "text": "", "quality": "complete", "expected": []},
+    {"id": "sensitive-email", "type": "user_message", "text": "请记住邮箱是 fictional.person@example.test", "quality": "complete", "sensitive": true, "expected": []},
+    {"id": "sensitive-phone", "type": "user_message", "text": "请记住联系电话是 +1 202-555-0100", "quality": "complete", "sensitive": true, "expected": []},
+    {"id": "sensitive-token", "type": "user_message", "text": "请记住 token=fictional-secret-value-123456", "quality": "complete", "sensitive": true, "expected": []},
+    {"id": "sensitive-private-key", "type": "user_message", "text": "请记住 -----BEGIN PRIVATE KEY----- fictional material -----END PRIVATE KEY-----", "quality": "complete", "sensitive": true, "expected": []},
+    {"id": "long-ordinary-chat", "type": "user_message", "text": "我们正在讨论一个虚构模块的边界、输入输出和测试策略，但这里没有要求保存任何信息。", "quality": "complete", "expected": []}
+  ],
+  "injection": [
+    {"id": "public-style", "prompt": "请按照先给结论，再列出验证结果的风格处理虚构项目。", "workspaceAllowed": true, "memories": [{"label": "style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": ["style"], "forbidden": []}},
+    {"id": "public-style-english-marker", "prompt": "Please follow concise fictional summaries, then process the fictional project.", "workspaceAllowed": true, "memories": [{"label": "summary", "key": "summary_style", "value": "concise fictional summaries", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": ["summary"], "forbidden": []}},
+    {"id": "public-preference", "prompt": "请使用虚构示例。", "workspaceAllowed": true, "memories": [{"label": "examples", "key": "example_style", "value": "虚构示例", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": ["examples"], "forbidden": []}},
+    {"id": "public-verification", "prompt": "请按照每次修改后运行类型检查的方式处理虚构代码。", "workspaceAllowed": true, "memories": [{"label": "verification", "key": "verification_style", "value": "每次修改后运行类型检查", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": ["verification"], "forbidden": []}},
+    {"id": "unrelated-topic", "prompt": "请检查虚构纸飞机的颜色。", "workspaceAllowed": true, "memories": [{"label": "style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": [], "forbidden": ["style"]}},
+    {"id": "private-only", "prompt": "请按照先给结论，再列出验证结果的风格处理虚构项目。", "workspaceAllowed": true, "memories": [{"label": "private-style", "key": "private_style", "value": "先给结论，再列出验证结果", "sensitivity": "private", "userConfirmed": true}], "expected": {"relevant": [], "forbidden": ["private-style"]}},
+    {"id": "unconfirmed-only", "prompt": "请按照先给结论，再列出验证结果的风格处理虚构项目。", "workspaceAllowed": true, "memories": [{"label": "unconfirmed-style", "key": "unconfirmed_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": false}], "expected": {"relevant": [], "forbidden": ["unconfirmed-style"]}},
+    {"id": "mixed-access", "prompt": "请按照先给结论，再列出验证结果的风格处理虚构项目。", "workspaceAllowed": true, "memories": [{"label": "public-style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true}, {"label": "private-style", "key": "private_style", "value": "先给结论，再列出验证结果", "sensitivity": "private", "userConfirmed": true}, {"label": "unconfirmed-style", "key": "unconfirmed_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": false}], "expected": {"relevant": ["public-style"], "forbidden": ["private-style", "unconfirmed-style"]}},
+    {"id": "workspace-denied", "prompt": "请按照先给结论，再列出验证结果的风格处理虚构项目。", "workspaceAllowed": false, "memories": [{"label": "style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": [], "forbidden": ["style"]}},
+    {"id": "missing-prompt", "prompt": null, "workspaceAllowed": true, "memories": [{"label": "style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": [], "forbidden": ["style"]}},
+    {"id": "short-query", "prompt": "蓝色纸飞机", "workspaceAllowed": true, "memories": [{"label": "project-code", "key": "project_code", "value": "蓝色纸飞机", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": ["project-code"], "forbidden": []}},
+    {"id": "approved-fact", "prompt": "请记住蓝色纸飞机。", "workspaceAllowed": true, "memories": [{"label": "project-code", "key": "project_code", "value": "蓝色纸飞机", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": ["project-code"], "forbidden": []}},
+    {"id": "blank-prompt", "prompt": "   ", "workspaceAllowed": true, "memories": [{"label": "style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true}], "expected": {"relevant": [], "forbidden": ["style"]}}
+  ],
+  "governance": [
+    {"id": "inbox-idempotency"},
+    {"id": "retention-pending-protection"},
+    {"id": "hook-install-idempotency"},
+    {"id": "hook-existing-config-backup"},
+    {"id": "watch-incremental-abort"},
+    {"id": "failure-fail-open"}
+  ]
+}
