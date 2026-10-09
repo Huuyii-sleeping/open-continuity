@@ -15,6 +15,10 @@ All notable changes to OpenContinuity are documented here. The project follows S
 - Multi-round `suite-v1` assessment with 185 independent assertions across Capture, Injection, Inbox governance, and fail-open behavior.
 - Idempotent `setup trae`, layered `doctor trae`, transactional per-thread Capture checkpoints, install-path refresh, cross-platform launchd fallback reporting, safer service lifecycle handling, and a process-level fictional Trae Adapter black-box test.
 
+### Changed
+
+- The product narrative now clarifies that shared memory and handoff remain the core product, while Capture Adapter → user-approved Inbox promotion → Injection Adapter → on-demand MCP deep query is the first complete productization path, with the Trae adapter as the reference implementation.
+
 ## [1.1.0-beta.1]
 
 ### Added

@@ -1,5 +1,7 @@
 # Agent compatibility
 
+当前兼容性工作的重点是“对话连续性 Adapter”，不是简单判断客户端是否能连接 MCP。Trae 适配器是第一条完整实现：Capture 负责读取本机 Agent 暴露的对话，Injection 负责把已批准记忆带回下一轮 Prompt，MCP 负责按需深度查询和交接。其他客户端目前先保证共享记忆 MCP 连接器，Capture/Injection 需要各自的官方扩展面和独立适配器。
+
 The connector matrix records the supported integration contract. A detected CLI is not automatically modified; users run `open-continuity connect <agent>` explicitly. Existing MCP entries are never replaced unless `--force` is supplied, and the connector backs up the client configuration first.
 
 | Client | Integration | Connector | Identity binding | Current verification |

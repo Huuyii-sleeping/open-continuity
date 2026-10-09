@@ -2,7 +2,23 @@
 
 ## 1. 产品定位
 
-OpenContinuity 是跨 Agent 的共享记忆基础设施，而不是通用文档问答或 RAG 框架。Agent 可以通过 MCP、HTTP 或后续 SDK 使用统一记忆契约；运行时负责把可共享的信息保存为有来源、有 scope、有版本、可撤销的记忆，并按调用 Agent、当前任务和上下文预算返回可解释的结果。
+OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆基础设施，而不是通用文档问答或 RAG 框架。当前产品化重点是把共享记忆接入 Agent 的真实对话闭环：Conversation Capture 从第三方 Agent 的官方可观测扩展面读取对话，先写入短期 Inbox；经用户批准后再进入跨 Agent 共享记忆；Memory Injection 在下一轮 Prompt 提供受预算约束的轻量上下文；Agent 需要更多证据时再通过 MCP 主动查询。
+
+Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不是对共享记忆的替代。系统不修改第三方 Agent 源码，不承诺 MCP 自动获得完整对话，也不提供云端存储或主动上传服务。
+
+### 当前主线（V1.2 前置实验）
+
+当前优先验证一条完整、可迁移的 Adapter 链路，而不是继续扩展检索算法：
+
+```text
+Agent runtime -> Capture Adapter -> Conversation Inbox
+             -> candidate policy -> explicit approval
+             -> shared memory store
+             -> Injection Adapter (light context)
+             -> MCP deep query (on demand)
+```
+
+这条链路的验收重点是：能否读取 Agent 官方扩展面暴露的完整可观测内容、能否增量且幂等地保存、能否只把有价值且经批准的内容沉淀为长期记忆、能否在下一轮安全注入，以及能否在需要时回退到 MCP 深搜。当前先以 Trae 适配器为参考实现，再将同一 Adapter 契约扩展到 Claude Code、Codex 等客户端。
 
 项目的四个设计关键词是：
 
@@ -287,13 +303,20 @@ memory-package/
 - Linux/macOS CI、兼容性矩阵、安全与贡献文档。
 - SQLite 完整性检查、一致性备份、带恢复点的显式恢复和可复现 Lite 性能基准。
 
-### V1.2：关系能力与协议深化
+### V1.2：Adapter 产品化与协议深化（当前优先）
+
+- 完成 Trae Capture/Injection 的稳定性、安装诊断、版本兼容和真实链路验收。
+- 明确 Capture、Inbox、长期记忆、Injection、MCP 深搜之间的边界与可观测回执。
+- 将 Adapter 契约抽象为可复用接口，为 Claude Code、Codex 等客户端提供独立适配器。
+- 在不改变本地优先和用户批准边界的前提下，再推进关系模型和 Memory Package 兼容性演进。
+
+### 后续：关系能力与协议深化
 
 - 关系模型和有明确收益的多跳查询。
 - Memory Package 合并策略、签名和兼容性版本演进。
 - 完成 Lite、Team、Enterprise 的能力协商与治理边界。
 
-### V1.2 前置实验：Conversation Capture 与 Injection（已实现 Trae 基础闭环）
+### V1.2 前置实验：Conversation Capture 与 Injection（Trae 基础闭环已实现）
 
 - Trae app-server capability probe、显式 thread 同步和基于 `updatedAt` + durable checkpoint 的 `watch`。
 - user、assistant、tool、compaction 的统一可观测事件模型。
@@ -303,7 +326,7 @@ memory-package/
 - `setup trae` 已聚合 MCP、Hook、workspace allowlist 与 macOS launchd Capture；`doctor trae` 分层报告运行状态和必须人工确认的 Hook 信任/MCP 审批边界。
 - 尚缺模型语义提取、候选合并与冲突处理、质量评分，以及面向 Claude/Codex 的独立 Capture/Injection Adapter。非 macOS 平台当前仍需以前台 `watch` 或用户自己的进程管理器运行。
 
-版本号表达能力成熟度，不代表每个部署都必须启用全部组件。Lite 在 V1.1 仍保持单机、低成本和可离线运行。
+当前版本号表达的是共享记忆底座和 Trae Adapter 的 Developer Preview 成熟度，不代表每个部署都必须启用全部组件。Lite 在 V1.1 仍保持单机、低成本和可离线运行。
 
 ## 8. 当前非目标
 

@@ -1,6 +1,8 @@
 # OpenContinuity
 
-OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆与任务交接层。它通过 MCP 或 HTTP 让不同 Agent 在同一用户身份和明确 scope 下读写同一事实层，并保留来源、版本、权限与审计历史。
+OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆与任务交接层。当前主线是把这套共享记忆接入 Agent 的真实对话闭环：为 CLI Agent 提供 Conversation Capture 与 Memory Injection Adapter，从 Agent 的官方可观测扩展面增量读取对话，先放入本地 Inbox，由用户选择性批准后沉淀为共享记忆，再在后续 Prompt 中注入少量相关上下文；需要更多证据时，Agent 仍可通过 MCP 主动深度查询。
+
+Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不是另一个独立产品。OpenContinuity 不修改第三方 Agent 源码，不把完整对话自动变成长期记忆，也不提供云端存储或主动上传服务。
 
 当前发布候选为 `1.1.0-beta.1`，定位是 Developer Preview：Lite 本地闭环已可验证，Team 是实现预览，Enterprise 尚未实现。
 
@@ -35,6 +37,32 @@ flowchart LR
   H --> L & T
 ```
 
+## 当前主线：让共享记忆进入 Agent 的真实对话闭环
+
+项目重点已经从“先做一个通用的共享记忆/RAG 服务”收敛为一条可验证的 Adapter 链路：
+
+```text
+第三方 Agent 对话
+      |
+      v
+Capture Adapter（当前优先 Trae 适配器）
+      |
+      v
+本地 Conversation Inbox（短期、可过期、可脱敏）
+      |
+      v
+候选提取 -> 用户批准/拒绝
+      |
+      v
+长期共享记忆（结构化、可审计、可撤销）
+      |
+      +--> Injection Adapter：下一轮 Prompt 的轻量上下文
+      |
+      +--> MCP：Agent 按需进行深度检索或任务交接
+```
+
+这条链路解决的是“共享记忆如何在不修改 Agent 源码的情况下被可靠地产生、筛选和使用”，而不是“把所有聊天记录做成一个向量库”。
+
 ## 为什么它不只是 RAG
 
 RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenContinuity 还解决：
@@ -46,12 +74,13 @@ RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenCon
 - **如何带走**：带校验摘要、与具体数据库解耦的 Memory Package。
 - **如何撤销**：查看、审计、遗忘、备份和恢复由用户控制。
 
-支持四类结构化记忆：`user_preference`、`user_fact`、`task_state` 和 `decision`。除 Agent 主动调用 MCP 外，实验性的 Trae Conversation Capture 还可以由后台 Capture Adapter 或显式同步读取 Trae 客户端已保存的可观测会话，先放入本地 Inbox，再提取待确认候选；只有用户显式批准的候选才会进入长期共享记忆。
+支持四类结构化记忆：`user_preference`、`user_fact`、`task_state` 和 `decision`。当前最重要的入口是实验性的 Trae Conversation Capture：后台 Capture Adapter 或显式同步读取 Trae 客户端已保存的可观测会话，先放入本地 Inbox，再提取待确认候选；只有用户显式批准的候选才会进入长期共享记忆。共享记忆层也仍可被其他支持 MCP 的 Agent 直接使用。
 
 ## 当前可验证能力
 
 | 能力 | 当前证据 |
 | --- | --- |
+| Trae 对话连续性闭环（当前主线） | 真实 app-server 只读探针、虚构进程级 Capture→审核→Hook→MCP 黑盒，以及纵向 E2E |
 | 跨 Agent 共享记忆与 Handoff | `open-continuity demo` 启动两个真实 MCP stdio 客户端进行隔离验证 |
 | Lite 本地运行 | SQLite、FTS5、事务、审计历史、备份与恢复 |
 | Agent 接入 | Trae 真实 MCP E2E 与 Conversation Capture；Claude Code 和 Codex 连接器自动化测试 |
