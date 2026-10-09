@@ -85,7 +85,7 @@ export function connectAgent(agent: AgentName, config: LocalConfig, serverPath: 
     }
     throw new Error(`Unable to connect ${agent}; the previous configuration was restored: ${added.output}`);
   }
-  config.connectedAgents[agent] = { binary, connectedAt: new Date().toISOString(), databasePath: config.databasePath, ...(backupPath ? { backupPath } : {}) };
+  config.connectedAgents[agent] = { binary, connectedAt: new Date().toISOString(), databasePath: config.databasePath, serverPath: resolve(serverPath), nodePath: process.execPath, ...(backupPath ? { backupPath } : {}) };
   try { saveConfig(config, env); } catch (error) {
     run(binary, connector.removeArgs, env);
     if (backupPath) copyFileSync(backupPath, connector.configPath(env));
@@ -105,7 +105,7 @@ export function disconnectAgent(agent: AgentName, config: LocalConfig, env: Node
   saveConfig(config, env);
 }
 
-export function connectorStatus(agent: AgentName, config: LocalConfig, env: NodeJS.ProcessEnv = process.env): { detected: boolean; configured: boolean; detail?: string } {
+export function connectorStatus(agent: AgentName, config: LocalConfig, env: NodeJS.ProcessEnv = process.env, expectedRuntime?: { serverPath: string; nodePath?: string }): { detected: boolean; configured: boolean; detail?: string } {
   const connector = connectors[agent];
   const binary = config.connectedAgents[agent]?.binary || findExecutable(connector.candidates, env);
   if (!binary) return { detected: false, configured: false, detail: "CLI not found" };
@@ -114,5 +114,9 @@ export function connectorStatus(agent: AgentName, config: LocalConfig, env: Node
     return { detected: true, configured: false, detail: "configured for a previous database; reconnect with --force" };
   }
   const result = run(binary, connector.getArgs, env);
+  const connection = config.connectedAgents[agent];
+  if (result.ok && connection && expectedRuntime && (connection.serverPath !== resolve(expectedRuntime.serverPath) || connection.nodePath !== (expectedRuntime.nodePath ?? process.execPath))) {
+    return { detected: true, configured: false, detail: "configured for a previous OpenContinuity runtime; reconnect with --force" };
+  }
   return { detected: true, configured: result.ok, ...(result.ok ? {} : { detail: result.output || "MCP server not configured" }) };
 }
