@@ -18,7 +18,16 @@ The command starts two MCP stdio clients with different Agent identities and one
 npm run release:check
 ```
 
-The gate performs TypeScript checking, the complete automated test suite, a production dependency audit against the public npm registry, a package-content dry run, and an isolated install from the generated tarball followed by the two-Agent MCP demo.
+The gate performs TypeScript checking, the complete automated test suite, Capture/Injection quality evaluations, a production dependency audit against the public npm registry, a package-content dry run, and an isolated install from the generated tarball. The installed-package smoke runs the two-Agent MCP demo, a fictional Claude Adapter setup/doctor, and the local data-governance status contract.
+
+The complete suite must include `test/trae-adapter-blackbox.test.ts`, which runs the fictional process boundary from idempotent `setup trae` through app-server Capture, candidate approval, the installed Hook executable, and real MCP stdio discovery/recall. It must not read the user's Trae history.
+
+It must also include:
+
+- `test/claude-adapter-blackbox.test.ts` for setup → Stop transcript Capture → candidate review → three UserPromptSubmit Injection rounds → MCP deep recall;
+- `test/candidate-review.test.ts` for cross-Agent occurrence merging, exact linking, explicit conflict replacement, and preserved version history;
+- `test/data-governance.test.ts` and `test/data-governance-cli.test.ts` for turn-level expiry, pre-import filtering, Receipt bounds, explicit purge, owner-only files, and long-term-memory preservation;
+- `npm run test:soak` either locally or in the scheduled Adapter soak workflow before promotion, with its cycle count and result recorded.
 
 Also run a release-sized local performance sample and preserve its raw JSON with the release evidence:
 
@@ -72,6 +81,11 @@ Do not connect a user's real Agent configuration during release verification unl
 Before announcing the preview, capture only fictional demo output and report the limits prominently:
 
 - MCP tool availability does not guarantee that a third-party Agent will call the tools automatically.
-- OpenContinuity does not intercept or export complete third-party conversations.
-- Trae has a real MCP end-to-end test; Claude Code and Codex still need environment-dependent product smoke tests.
-- Enterprise, semantic vector retrieval, model-based extraction, and graph reasoning are roadmap items, not current capabilities.
+- MCP alone does not expose a client's complete conversation. Experimental Trae Capture reads only app-server-visible content after explicit setup/sync opt-in and stages it locally.
+- Trae Injection is opt-in and workspace-scoped; it reads only approved public memory through a bounded `UserPromptSubmit` hook, records a Prompt fingerprint rather than the Prompt body, and fails open on timeout or storage errors.
+- Claude Code Capture/Injection is also opt-in and workspace-scoped. It uses the documented `Stop` transcript and `UserPromptSubmit` Hook contracts, filters OpenContinuity's own injected context, and needs a client restart after setup. Until a real installed-client smoke is recorded, describe it as protocol/black-box verified rather than real-client verified.
+- Raw Inbox turns expire after 7 days even inside an active long-running conversation and are filtered before re-import; pending candidate evidence defaults to 30 days. Injection receipts default to 30 days and 5000 entries. Verify `data status`, `data cleanup`, and `data purge-transient --yes`, including that the last operation preserves approved long-term memory.
+- The capture watch command remains an interruptible foreground polling loop; on macOS, `setup trae` installs/reloads an optional per-user launchd service. Verify the generated plist contains the detected Trae executable directory in its bounded PATH allowlist, then verify pagination bounds, transactional thread/turn/item checkpoints, the single-instance lock, retry behavior, persisted sync status, and service logs. Verify `doctor trae` reports Hook/MCP manual approval boundaries instead of enabling a global bypass.
+- Trae has a real app-server read probe plus directed end-to-end tests. Claude Code has a full independent Capture/Injection Adapter and process black-box but still needs an environment-dependent real-client smoke. Codex has a real app-server protocol/metadata probe, an independent process black-box, a real persisted `codex exec` smoke, and a real interactive `/hooks → Trust all → prompt` smoke. The automated injection assertion used the one-shot `--dangerously-bypass-hook-trust`; before release, repeat a fictional turn in a fresh Codex process after reviewing `/hooks`, and verify `capture status`, `capture candidates`, and the next `UserPromptSubmit` output without recording real transcript text.
+- The Trae vertical adapter test covers a fictional app-server thread through Capture, candidate approval, light UserPromptSubmit injection, and explicit MCP multi-step retrieval. A separate read-only probe against the installed Trae executable verifies app-server initialization and visible-thread normalization without writing the user's real conversation into the test database. The Codex probe follows the same rule but records only CLI version, initialize result keys, thread-list shape, counts, and field keys; it must never print `thread/read` message text.
+- Enterprise, semantic vector retrieval, model-based extraction/reconciliation, conditional preference merging, and graph reasoning are roadmap items. Deterministic sensitive-field redaction, exact candidate merging, conservative similarity-based replacement review, version evolution, and layered transient-data retention are current Lite capabilities.

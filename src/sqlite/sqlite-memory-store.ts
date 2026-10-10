@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
@@ -106,6 +106,7 @@ export class SqliteMemoryStore implements MemoryStore {
       configureSqlite(this.database);
       if (options.autoMigrate !== false) migrateSqlite(this.database);
       else this.database.prepare("SELECT 1 FROM open_continuity_schema_migrations LIMIT 1").get();
+      this.secureDatabaseFiles();
     } catch (error) {
       if (database.isOpen) database.close();
       throw this.storageError(error);
@@ -268,8 +269,16 @@ export class SqliteMemoryStore implements MemoryStore {
 
   close(): void {
     if (this.closed) return;
+    this.secureDatabaseFiles();
     this.database.close();
     this.closed = true;
+  }
+
+  private secureDatabaseFiles(): void {
+    if (this.databasePath === ":memory:") return;
+    for (const path of [this.databasePath, `${this.databasePath}-wal`, `${this.databasePath}-shm`]) {
+      if (existsSync(path)) chmodSync(path, 0o600);
+    }
   }
 
   private importEvent(event: MemoryEvent): void {

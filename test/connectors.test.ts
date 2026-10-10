@@ -39,6 +39,7 @@ esac
     expect(argumentsText).toContain("OPEN_CONTINUITY_AGENT_ID=trae");
     expect(config.connectedAgents.trae).toMatchObject({ databasePath: config.databasePath });
     expect(connectorStatus("trae", config, env)).toMatchObject({ detected: true, configured: true });
+    expect(connectorStatus("trae", config, env, { serverPath: "/tmp/other-install/server.js", nodePath: process.execPath })).toMatchObject({ detected: true, configured: false, detail: expect.stringContaining("previous OpenContinuity runtime") });
     config.databasePath = join(home, "restored.db");
     expect(connectorStatus("trae", config, env)).toMatchObject({ detected: true, configured: false, detail: expect.stringContaining("previous database") });
     config.databasePath = config.connectedAgents.trae!.databasePath!;

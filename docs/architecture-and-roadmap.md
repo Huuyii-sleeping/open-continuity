@@ -2,7 +2,23 @@
 
 ## 1. 产品定位
 
-OpenContinuity 是跨 Agent 的共享记忆基础设施，而不是通用文档问答或 RAG 框架。Agent 可以通过 MCP、HTTP 或后续 SDK 使用统一记忆契约；运行时负责把可共享的信息保存为有来源、有 scope、有版本、可撤销的记忆，并按调用 Agent、当前任务和上下文预算返回可解释的结果。
+OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆基础设施，而不是通用文档问答或 RAG 框架。当前产品化重点是把共享记忆接入 Agent 的真实对话闭环：Conversation Capture 从第三方 Agent 的官方可观测扩展面读取对话，先写入短期 Inbox；经用户批准后再进入跨 Agent 共享记忆；Memory Injection 在下一轮 Prompt 提供受预算约束的轻量上下文；Agent 需要更多证据时再通过 MCP 主动查询。
+
+Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不是对共享记忆的替代。系统不修改第三方 Agent 源码，不承诺 MCP 自动获得完整对话，也不提供云端存储或主动上传服务。
+
+### 当前主线（V1.2 前置实验）
+
+当前优先验证一条完整、可迁移的 Adapter 链路，而不是继续扩展检索算法：
+
+```text
+Agent runtime -> Capture Adapter -> Conversation Inbox
+             -> candidate policy -> explicit approval
+             -> shared memory store
+             -> Injection Adapter (light context)
+             -> MCP deep query (on demand)
+```
+
+这条链路的验收重点是：能否读取 Agent 官方扩展面暴露的完整可观测内容、能否增量且幂等地保存、能否只把有价值且经批准的内容沉淀为长期记忆、能否在下一轮安全注入，以及能否在需要时回退到 MCP 深搜。Trae app-server、Claude Code Hooks 与 Codex app-server 已经验证同一 Adapter 契约可以覆盖“常驻增量同步”和“生命周期事件驱动”两种接入形态；Codex 仍保留 MCP 作为深搜通道。
 
 项目的四个设计关键词是：
 
@@ -15,7 +31,7 @@ RAG、Agentic Retrieval、多路召回和图谱只是 Read Pipeline 的可插拔
 
 ## 2. 当前事实与设计目标
 
-### V1.1 Developer Preview 已实现
+### 当前 Developer Preview 已实现
 
 - MCP stdio 与 HTTP 两种接入方式。
 - `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`、`memory_handoff_create`、`memory_handoff_resume` 九个工具。
@@ -44,12 +60,21 @@ RAG、Agentic Retrieval、多路召回和图谱只是 Read Pipeline 的可插拔
 - Profile 级步骤、超时、子查询和历史事件预算，以及显式确定性降级原因。
 - 幂等写入、分页游标、来源 Agent、版本与用户确认标记。
 - PostgreSQL 迁移、并发初始化锁、事务更新和遗忘。
+- 实验性 Trae Conversation Capture：app-server 同步与 `watch` 轮询、基于 `updatedAt` 的增量读取、统一回合/消息模型、独立 SQLite Inbox、规则候选提取、敏感字段脱敏/阻断、7 天保留清理和人工 approve/reject。
+- 实验性 Trae Injection Adapter：`UserPromptSubmit` command hook、一键安装/检查与备份、workspace allowlist、已批准 public 记忆的轻量 Context Pack、200ms 超时、fail-open 和不含 Prompt 原文的本地 Receipt。
+- Trae Adapter 成熟化基础：幂等 `setup trae`、分层 `doctor trae`、可安全重载的 launchd 生命周期，以及与 Inbox 同事务推进的 thread/turn/item checkpoint。
+- 通用 `CaptureAdapter` / `InjectionAdapter` 契约、按 Adapter source 隔离的 checkpoint 与查询，以及 Capture/Injection 双 workspace allowlist。
+- Claude Code Adapter：官方 `Stop` transcript Capture、`UserPromptSubmit` Injection、幂等 `setup/doctor`、已有设置保留与备份、逐记录 workspace 过滤和自注入反馈过滤。
+- Codex CLI Adapter：官方本地 `app-server --stdio` Capture、`Stop` Capture Hook、`UserPromptSubmit` Injection Hook、幂等 `setup/doctor`、`$CODEX_HOME/hooks.json` 备份与保留、reasoning 内容不落盘，以及 app-server 不可用时明确降级为 MCP-only。
+- 候选 exact 去重和跨 Agent occurrence 合并；对确定性高相似候选要求显式指定被替换 memory，并复用 `expectedVersion`/`supersedes` 生成可审计的新版本。
+- 本地瞬时数据治理：原始回合默认 7 天、pending 候选默认 30 天、Receipt 默认 30 天且最多 5000 条；支持自动/手动 cleanup、显式 purge，并保留长期共享记忆。
+- Capture/长期记忆 SQLite 与 Receipt 文件使用 owner-only 权限；Adapter 具备契约测试、故障恢复、1000-cycle soak 和完全虚构的进程黑盒。
 
 ### 尚未实现
 
 - embedding、pgvector、语义向量召回和 rerank。
 - 基于模型的语义查询规划、知识图谱和关系多跳推理。
-- 记忆自动提取、语义冲突判断、条件化偏好归并和归并撤销。
+- 基于模型的记忆提取、语义冲突判断、条件化偏好归并和归并撤销；当前 Capture 使用显式信号规则与确定性字符相似度，只做保守去重/替换门禁，不冒充语义理解。
 - 基于模型的语义压缩与特定模型 tokenizer 精确计数。
 - 多租户、OAuth、管理后台和企业级策略引擎。
 
@@ -119,8 +144,8 @@ identity / scope / permission / capability / budget
 Write Pipeline     Read Pipeline
 validate           classify
 extract(*)         bounded plan
-deduplicate        recall / history
-reconcile(*)       fuse / rerank(*)
+  deduplicate        recall / history
+  review conflict    fuse / rerank(*)
 version            build Context Pack
 audit              sufficiency / receipt
       |               |
@@ -132,6 +157,42 @@ SQLite / PostgreSQL / optional vector and graph indexes
 
 (*) 后续版本能力
 ```
+
+Agent Capture 在统一协议之前增加一层可撤销的本地暂存：
+
+```text
+Trae app-server / Claude Stop transcript / Codex app-server
+                    | Capture Adapter + workspace allowlist
+                    v
+         Conversation Inbox (capture.db, turn TTL)
+                    | normalize + quality gate + candidate review
+                    v
+              pending candidates (separate TTL)
+                    | explicit approve / explicit replacement
+                    v
+           Write Pipeline (memories.db, version history)
+```
+
+Injection Adapter 是反方向的轻量读路径：
+
+```text
+Trae / Claude UserPromptSubmit
+        |
+        v
+workspace allowlist + local config
+        |
+        v
+public + user-confirmed memory_context
+        |  <= 800 estimated tokens / <= 8 memories / <= 200 ms
+        v
+additionalContext (untrusted reference data)
+        |
+        +--> Injection Receipt (prompt fingerprint only)
+```
+
+Injection 不承担深度检索、模型推理或长期对话保存。Agent 需要更多证据时，仍通过 MCP `memory_recall` / `memory_context` / `memory_query` 主动查询；Hook 失败、超时或未命中都返回继续执行的空动作。
+
+Inbox 保存“用于判断什么值得沉淀的可观测证据”，长期记忆只保存用户批准后的结构化结果。两层隔离避免把“工具看见过某段对话”等同于“这段对话已经成为共享记忆”。
 
 三个 Profile 必须复用同一个 Protocol、Write/Read Pipeline 接口和结果模型。Profile 只决定启用哪些存储适配器、检索通道与预算策略，不能复制三套互相漂移的业务逻辑。
 
@@ -251,17 +312,39 @@ memory-package/
 - Linux/macOS CI、兼容性矩阵、安全与贡献文档。
 - SQLite 完整性检查、一致性备份、带恢复点的显式恢复和可复现 Lite 性能基准。
 
-### V1.2：关系能力与协议深化
+### V1.2：Adapter 产品化与协议深化（Beta 候选已完成基础闭环）
+
+- 已完成 Trae Capture/Injection 的稳定性、安装诊断、真实只读探针和进程黑盒；Codex 也已完成 app-server 只读探针与独立进程黑盒，具体客户端版本变化仍需持续兼容验证。
+- 已明确 Capture、短期 Inbox、候选审核、长期共享记忆、轻量 Injection 和 MCP 深搜的边界，并补齐保留/清理策略。
+- 已抽象通用 Adapter 契约并实现 Claude Code、Codex 两个独立 Adapter；真实 Codex 持久化 `codex exec` smoke 与交互式 `/hooks → Trust all → prompt` smoke 已通过，真实 Claude Code 客户端 smoke 仍待对应环境验证；新 Codex 进程是否复用信任仍由客户端生命周期决定。
+- 已实现确定性候选去重、保守冲突门禁和显式版本演化；基于模型的语义归并仍是后续可选能力。
+- 下一步是在不改变本地优先和用户批准边界的前提下，收集真实 Beta 兼容数据，再决定各客户端兼容性维护与关系模型的优先级。
+
+### 后续：关系能力与协议深化
 
 - 关系模型和有明确收益的多跳查询。
 - Memory Package 合并策略、签名和兼容性版本演进。
 - 完成 Lite、Team、Enterprise 的能力协商与治理边界。
 
-版本号表达能力成熟度，不代表每个部署都必须启用全部组件。Lite 在 V1.1 仍保持单机、低成本和可离线运行。
+### V1.2 Conversation Capture 与 Injection（Trae + Claude + Codex 基础闭环已实现）
+
+- Trae app-server capability probe、显式 thread 同步和基于 `updatedAt` + durable checkpoint 的 `watch`。
+- user、assistant、tool、compaction 的统一可观测事件模型。
+- completed/final-answer 完整性判断，临时 side thread 过滤和重复同步幂等。
+- 规则型显式信号提取，候选默认 private/pending；普通批准保留 private，只有显式 `--share` 才成为默认跨 Agent 可读的 public 记忆。
+- UserPromptSubmit 注入已实现基础版本：workspace 显式开启、public + userConfirmed 过滤、受限 Context Pack、超时与 fail-open、Receipt 审计。
+- `setup trae` 已聚合 MCP、Hook、workspace allowlist 与 macOS launchd Capture；`doctor trae` 分层报告运行状态和必须人工确认的 Hook 信任/MCP 审批边界。
+- `setup claude` 已聚合 MCP、双 Hook 与 workspace allowlist；Stop transcript Capture 不依赖常驻服务，并处理异步最终回复、workspace 切换和自注入反馈。
+- `setup codex` 已聚合 MCP、app-server Capture、双 Hook 与 workspace allowlist；`thread/turns/list` 优先、旧版 `thread/read` 回退，reasoning 只保留类型标记；Hook 配置写入前备份且可幂等重跑。
+- 候选 exact 重复会合并 occurrence；确定性高相似内容必须经用户指定目标后才能演化为新版本，不会静默覆盖。
+- 原始回合、pending 候选和 Receipt 采用分层 TTL/数量限制，可查询、立即清理或显式清空瞬时层；长期共享记忆不受瞬时 purge 影响。
+- 尚缺模型语义提取、条件化偏好自动归并和真实 Claude 客户端 smoke。Codex 已有真实持久化与交互式 smoke，自动化注入断言使用单次 `--dangerously-bypass-hook-trust`，新进程仍可能需要用户在 `/hooks` 中信任 Hook。Trae 在非 macOS 平台当前仍需以前台 `watch` 或用户自己的进程管理器运行。
+
+当前版本号表达的是共享记忆底座与首批三种 Adapter 的 Developer Preview 成熟度，不代表每个部署都必须启用全部组件。Lite 在 V1.1 仍保持单机、低成本和可离线运行。
 
 ## 8. 当前非目标
 
-- 不承诺仅靠 MCP 自动获得 Agent 的完整对话。
+- 不承诺仅靠 MCP 自动获得 Agent 的完整对话；Trae/Codex Capture 依赖本机 app-server，Claude Capture 依赖公开 Stop transcript Hook。
 - 不要求使用者修改第三方闭源 Agent 的源码。
 - 不在个人版默认启用外部 embedding 或推理服务。
 - 不为了展示技术而强制引入独立向量数据库、图数据库、消息队列或微服务。

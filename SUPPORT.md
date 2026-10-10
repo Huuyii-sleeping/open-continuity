@@ -16,9 +16,10 @@ Only the newest prerelease receives fixes before the first stable release. After
 Before reporting a problem:
 
 1. Run `open-continuity doctor`.
-2. Run `open-continuity demo` to separate runtime problems from Agent-client behavior.
-3. Check the compatibility matrix and known limitations in the README.
-4. Create a minimal reproduction using fictional data.
+2. For an Adapter issue, run `open-continuity doctor trae --workspace <path>`, `open-continuity doctor claude --workspace <path>`, or `open-continuity doctor codex --workspace <path>` and `open-continuity data status`.
+3. Run `open-continuity demo` to separate shared-memory runtime problems from Agent-client behavior.
+4. Check the compatibility matrix and known limitations in the README.
+5. Create a minimal reproduction using fictional data.
 
 Use the Bug Report template for reproducible defects and the Feature Request template for product proposals. Do not put secrets, private memory exports, real conversations, or internal logs in public issues.
 

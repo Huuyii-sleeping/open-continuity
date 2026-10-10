@@ -15,7 +15,7 @@ export async function runDoctor(config: LocalConfig, serverPath: string, env: No
   const databaseExists = existsSync(config.databasePath);
   checks.push({ name: "Database", status: databaseExists ? "pass" : "warn", detail: databaseExists ? `${config.databasePath} (${statSync(config.databasePath).size} bytes)` : `${config.databasePath} will be created on first use` });
   for (const agent of ["trae", "claude", "codex"] as AgentName[]) {
-    const status = connectorStatus(agent, config, env);
+    const status = connectorStatus(agent, config, env, { serverPath, nodePath: process.execPath });
     checks.push({ name: `${agent} connector`, status: status.configured ? "pass" : "warn", detail: status.configured ? "configured" : status.detail || "not configured" });
   }
   const transport = new StdioClientTransport({

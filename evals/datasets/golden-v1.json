@@ -1,0 +1,91 @@
+{
+  "version": "golden-v1",
+  "description": "Fictional deterministic cases for OpenContinuity Capture selection and Trae Injection safety.",
+  "capture": [
+    {
+      "id": "explicit-preference",
+      "text": "我偏好先给结论，再列出验证结果。",
+      "quality": "complete",
+      "expected": {"kind": "user_preference", "value": "先给结论，再列出验证结果"}
+    },
+    {
+      "id": "explicit-fact",
+      "text": "请记住虚构项目代号是蓝色纸飞机。",
+      "quality": "complete",
+      "expected": {"kind": "user_fact", "value": "虚构项目代号是蓝色纸飞机"}
+    },
+    {
+      "id": "explicit-decision",
+      "text": "我们决定以后先运行类型检查，再运行完整测试。",
+      "quality": "complete",
+      "expected": {"kind": "decision", "value": "先运行类型检查，再运行完整测试"}
+    },
+    {
+      "id": "interrupted-preference",
+      "text": "以后请使用虚构示例。",
+      "quality": "interrupted",
+      "expected": {"kind": "user_preference", "value": "使用虚构示例", "maxConfidence": 0.6}
+    },
+    {
+      "id": "ordinary-chat",
+      "text": "请解释一下虚构模块的工作方式。",
+      "quality": "complete",
+      "expected": null
+    },
+    {
+      "id": "sensitive-email",
+      "text": "请记住邮箱是 fictional.person@example.test",
+      "quality": "complete",
+      "sensitive": true,
+      "expected": null
+    },
+    {
+      "id": "sensitive-token",
+      "text": "请记住 token=fictional-secret-value-123456",
+      "quality": "complete",
+      "sensitive": true,
+      "expected": null
+    }
+  ],
+  "injection": [
+    {
+      "id": "approved-public-style",
+      "prompt": "请按照先给结论，再列出验证结果的风格处理虚构项目。",
+      "workspaceAllowed": true,
+      "memories": [
+        {"label": "style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true},
+        {"label": "private-style", "key": "private_style", "value": "先给结论，再列出验证结果", "sensitivity": "private", "userConfirmed": true},
+        {"label": "unconfirmed-style", "key": "unconfirmed_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": false}
+      ],
+      "expected": {"relevant": ["style"], "forbidden": ["private-style", "unconfirmed-style"]}
+    },
+    {
+      "id": "unrelated-prompt",
+      "prompt": "请检查虚构纸飞机的颜色。",
+      "workspaceAllowed": true,
+      "memories": [
+        {"label": "style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true}
+      ],
+      "expected": {"relevant": [], "forbidden": ["style"]}
+    },
+    {
+      "id": "allowed-confirmation-gate",
+      "prompt": "请按照每次修改后运行类型检查的方式处理虚构代码。",
+      "workspaceAllowed": true,
+      "memories": [
+        {"label": "confirmed-check", "key": "verification_style", "value": "每次修改后运行类型检查", "sensitivity": "public", "userConfirmed": true},
+        {"label": "unconfirmed-check", "key": "unconfirmed_verification", "value": "每次修改后运行类型检查", "sensitivity": "public", "userConfirmed": false}
+      ],
+      "expected": {"relevant": ["confirmed-check"], "forbidden": ["unconfirmed-check"]}
+    },
+    {
+      "id": "workspace-boundary",
+      "prompt": "请按照先给结论，再列出验证结果的风格处理虚构项目。",
+      "workspaceAllowed": false,
+      "memories": [
+        {"label": "style", "key": "response_style", "value": "先给结论，再列出验证结果", "sensitivity": "public", "userConfirmed": true}
+      ],
+      "expected": {"relevant": [], "forbidden": ["style"]}
+    }
+  ]
+}

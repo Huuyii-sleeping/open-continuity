@@ -6,6 +6,7 @@ export interface ContextPackPolicy {
   defaultTokenBudget: number;
   maxTokenBudget: number;
   maxMemories: number;
+  requireUserConfirmed?: boolean;
 }
 
 interface RankedContextMemory { memory: ResolvedMemory; priority: number; reasons: ContextSelectionReason[]; }
@@ -46,7 +47,8 @@ export class ContextPackBuilder {
       throw new OpenContinuityError("VALIDATION_ERROR", "tokenBudget exceeds the active profile limit", 400, { requestedTokens, maxTokenBudget: this.policy.maxTokenBudget });
     }
     const maxMemories = Math.min(input.maxMemories ?? this.policy.maxMemories, this.policy.maxMemories);
-    const ranked = memories.map((memory) => this.rank(memory, input)).sort(compareContextMemory);
+    const visibleMemories = this.policy.requireUserConfirmed ? memories.filter((memory) => memory.userConfirmed) : memories;
+    const ranked = visibleMemories.map((memory) => this.rank(memory, input)).sort(compareContextMemory);
     const items: ContextPackItem[] = [];
     const omitted: ContextPackOmission[] = [];
     const lines: string[] = [];

@@ -1,6 +1,8 @@
 # OpenContinuity
 
-OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆与任务交接层。它通过 MCP 或 HTTP 让不同 Agent 在同一用户身份和明确 scope 下读写同一事实层，并保留来源、版本、权限与审计历史。
+OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆与任务交接层。当前主线是把这套共享记忆接入 Agent 的真实对话闭环：为 CLI Agent 提供 Conversation Capture 与 Memory Injection Adapter，从 Agent 的官方可观测扩展面增量读取对话，先放入本地 Inbox，由用户选择性批准后沉淀为共享记忆，再在后续 Prompt 中注入少量相关上下文；需要更多证据时，Agent 仍可通过 MCP 主动深度查询。
+
+Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不是另一个独立产品。OpenContinuity 不修改第三方 Agent 源码，不把完整对话自动变成长期记忆，也不提供云端存储或主动上传服务。
 
 当前发布候选为 `1.1.0-beta.1`，定位是 Developer Preview：Lite 本地闭环已可验证，Team 是实现预览，Enterprise 尚未实现。
 
@@ -35,6 +37,32 @@ flowchart LR
   H --> L & T
 ```
 
+## 当前主线：让共享记忆进入 Agent 的真实对话闭环
+
+项目重点已经从“先做一个通用的共享记忆/RAG 服务”收敛为一条可验证、可迁移的 Adapter 链路：
+
+```text
+第三方 Agent 对话
+      |
+      v
+Capture Adapter（Trae app-server / Claude Stop transcript / Codex app-server）
+      |
+      v
+本地 Conversation Inbox（短期、可过期、可脱敏）
+      |
+      v
+候选提取 -> 用户批准/拒绝
+      |
+      v
+长期共享记忆（结构化、可审计、可撤销）
+      |
+      +--> Injection Adapter：下一轮 Prompt 的轻量上下文
+      |
+      +--> MCP：Agent 按需进行深度检索或任务交接
+```
+
+这条链路解决的是“共享记忆如何在不修改 Agent 源码的情况下被可靠地产生、筛选和使用”，而不是“把所有聊天记录做成一个向量库”。
+
 ## 为什么它不只是 RAG
 
 RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenContinuity 还解决：
@@ -46,15 +74,18 @@ RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenCon
 - **如何带走**：带校验摘要、与具体数据库解耦的 Memory Package。
 - **如何撤销**：查看、审计、遗忘、备份和恢复由用户控制。
 
-支持四类结构化记忆：`user_preference`、`user_fact`、`task_state` 和 `decision`。OpenContinuity 不会自动截取第三方 Agent 的完整对话；Agent 是否主动调用工具仍取决于客户端与模型工具策略。
+支持四类结构化记忆：`user_preference`、`user_fact`、`task_state` 和 `decision`。Trae、Claude Code 与 Codex CLI 已有独立的实验性 Capture/Injection Adapter：它们从各自公开扩展面读取可观测会话，先放入本地 Inbox，再提取待确认候选；只有用户显式批准的候选才会进入长期共享记忆。共享记忆层也仍可被其他支持 MCP 的 Agent 直接使用。
 
 ## 当前可验证能力
 
 | 能力 | 当前证据 |
 | --- | --- |
+| Trae Adapter 闭环 | 真实 app-server 只读探针、虚构进程级 Capture→审核→Hook→MCP 黑盒，以及纵向 E2E |
+| Claude Code Adapter 闭环 | 官方 Hook/transcript 契约、虚构进程级 setup→Stop Capture→审核→UserPromptSubmit Injection→MCP 深搜黑盒；真实客户端 smoke 待安装环境验证 |
+| Codex Adapter 闭环 | 本机 `codex-cli 0.162.1` app-server 只读探针、虚构进程级黑盒、真实持久化 `codex exec` smoke，以及真实 `/hooks → Trust all → prompt` 交互 smoke 均通过；自动化注入断言使用单次 bypass，新 Codex 进程仍可能需要重新检查 `/hooks` |
 | 跨 Agent 共享记忆与 Handoff | `open-continuity demo` 启动两个真实 MCP stdio 客户端进行隔离验证 |
 | Lite 本地运行 | SQLite、FTS5、事务、审计历史、备份与恢复 |
-| Agent 接入 | Trae 真实 MCP E2E；Claude Code 和 Codex 连接器自动化测试 |
+| Agent 接入 | Trae、Claude Code 与 Codex 有 Capture/Injection Adapter；其他 Agent 可继续使用 MCP/HTTP |
 | 可移植性 | Memory Package 校验、空目标导入和本地身份重绑定 |
 | 发布质量 | macOS/Linux、Node.js 22/24 CI，完整测试、审计、打包和安装后冒烟 |
 
@@ -66,11 +97,26 @@ RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenCon
 
     npm install --global open-continuity
     open-continuity demo
-    open-continuity init
-    open-continuity connect trae
-    open-continuity doctor
+    open-continuity setup trae --workspace "$PWD"
+    open-continuity doctor trae --workspace "$PWD"
+
+Claude Code 使用对应的一键入口：
+
+    open-continuity setup claude --workspace "$PWD"
+    open-continuity doctor claude --workspace "$PWD"
+
+Codex CLI 使用对应的一键入口：
+
+    open-continuity setup codex --workspace "$PWD"
+    open-continuity doctor codex --workspace "$PWD"
 
 `connect` 会拒绝把临时 `npx` 缓存路径写入永久客户端配置；全局安装或项目内持久安装都可以。
+
+`setup trae` 是 Trae 的推荐接入入口：它会在需要时完成本地初始化，核验 Trae app-server，连接 OpenContinuity MCP，把指定 workspace 同时加入 Capture 与 Injection allowlist，备份并安装 `UserPromptSubmit` Hook，再在 macOS 安装和启动用户级 Capture 服务。命令可重复执行；只有配置或安装路径变化时才会刷新 MCP/重载服务。非 macOS 环境会保留前台 `capture watch` 接入方式。随后运行 `doctor trae`，可以逐层检查 Capture、checkpoint、Hook、MCP 和本地数据库。Trae 不提供可脚本化的 Hook 信任状态，也不应被设置为全局免审批，因此仍需在 Trae `/hooks` 中确认 Hook，并在需要深度查询时按正常策略批准 OpenContinuity MCP 只读工具。
+
+`setup claude` 使用 Claude Code 官方用户级 Hooks：`Stop` Hook 在一轮完成后读取该会话的 transcript，`UserPromptSubmit` Hook 在下一轮注入少量已批准共享记忆；两者都受同一 workspace allowlist 约束。安装器保留已有 `settings.json` 内容并在修改前备份。设置后需要重启正在运行的 Claude Code 会话，再用 `doctor claude` 检查 Hook、Capture 水位、MCP 和数据库。OpenContinuity 不会关闭 Claude Code 自己的 MCP 审批。
+
+`setup codex` 使用 Codex 本地 `app-server --stdio` 读取已保存线程，并在 `$CODEX_HOME/hooks.json`（通常为 `~/.codex/hooks.json`）安装官方 `Stop` 与 `UserPromptSubmit` command hooks。`Stop` 只把当前 session 的可观测回合增量同步到 Inbox；`UserPromptSubmit` 只注入已批准的 public 记忆。安装器会备份已有 hooks 配置并可幂等重跑。设置后需要重启正在运行的 Codex 会话，并在 Codex `/hooks` 页面检查、信任两个 Hook。真实持久化 `codex exec` smoke 和真实交互式 `/hooks → Trust all → prompt` smoke 均已验证；自动化注入断言使用单次 `--dangerously-bypass-hook-trust`，新进程是否复用信任仍取决于 Codex 生命周期。若本机 Codex 不提供 `app-server`，请继续使用 `connect codex` 的 MCP-only 模式。
 
 `demo` 是不修改真实配置的产品证明：它会启动两个使用不同 Agent 身份的真实 MCP stdio 进程，让 Agent A 向临时 SQLite 写入记忆并创建 Handoff Capsule，关闭 Agent A 后再由 Agent B 读取记忆和恢复交接，最后自动删除临时数据库。它不要求提前执行 `init`，也不会访问 `~/.open-continuity/memories.db`。
 
@@ -98,6 +144,57 @@ RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenCon
     open-continuity export --output ./memory-package
     open-continuity import ./memory-package
 
+对话候选审核流程（Trae 与 Claude 共用同一 Inbox）：
+
+    open-continuity capture doctor
+    open-continuity capture sync --thread <trae-thread-id>
+    open-continuity capture thread <trae-thread-id>
+    open-continuity capture candidates
+    open-continuity capture approve <candidate-id> --share
+    open-continuity capture approve <candidate-id> --share --replace-memory <memory-id>
+    open-continuity capture reject <candidate-id>
+    open-continuity capture status --source trae
+    open-continuity capture status --source claude
+    open-continuity capture watch --once
+    open-continuity capture watch --interval 5000
+    open-continuity capture service install
+    open-continuity capture service start
+    open-continuity capture service status
+    open-continuity capture service stop
+    open-continuity capture service uninstall
+
+本地短期数据治理：
+
+    open-continuity data status
+    open-continuity data cleanup
+    open-continuity data purge-transient --yes
+
+Trae 每轮轻量记忆注入（实验性）：
+
+    open-continuity injection enable "$PWD"
+    open-continuity injection status --json
+    open-continuity injection disable
+
+如需拆开排障或手动管理，也可以使用上面的 Capture/Injection 子命令。`injection enable` 只会把当前 workspace 加入 OpenContinuity 自己的 allowlist；推荐由 `setup trae` 负责完整接入。启用后，在 Trae 用户级 `$TRAECLI_HOME/hooks.json`（没有设置时通常是 `$HOME/.trae/hooks.json`）增加下面的 `UserPromptSubmit` command hook；把命令中的路径替换成 `injection status --json` 返回的绝对路径：
+
+    {
+      "hooks": {
+        "UserPromptSubmit": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "node /absolute/path/to/open-continuity/dist/src/injection-hook.js",
+                "timeout": 1
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+Hook 默认关闭，且只检索已批准、`public`、当前 workspace 可见的记忆；每次最多注入 8 条、800 token 估算预算，查询超过 200ms 或发生存储错误时 fail open，不阻塞 Agent。注入内容会明确标记为不可信参考数据。审计回执只保存 Prompt 的短 SHA-256 指纹，不保存 Prompt 原文，写入 `~/.open-continuity/injection-receipts.jsonl`。可以用 `injection install-hook` 自动备份并更新 Trae 用户级 `hooks.json`，再用 `injection check-hook` 检查，Trae 内用 `/hooks` 确认；`injection disable` 会立即停止注入，但不会删除已写入回执。`capture watch` 默认以前台可中断轮询方式读取 `updatedAt` 发生变化的 thread，`--once` 用于单轮验证。每个成功导入的 thread 都会在同一 SQLite 事务内推进 durable checkpoint，记录 thread 更新时间、最后 turn、最后 item 和 item 总数；导入失败时 Inbox 与 checkpoint 一起回滚。`capture status` 和 `doctor trae` 会公开水位与恢复健康状态。
+
 恢复和删除操作必须显式添加 `--yes`。恢复会写入一个新的数据库文件并原子切换本地配置，旧数据库不被覆盖；此前连接的 Agent 需要执行 `open-continuity connect <agent> --force` 并重启客户端，才能使用新库。CLI 导出只包含当前本地用户的数据；导入只接受通过校验且目标数据库为空的 Memory Package，并将来源用户身份重新绑定到当前本地用户，不会静默合并或覆盖现有记忆。
 
 ## 源码开发
@@ -111,7 +208,7 @@ RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenCon
 
 HTTP 服务默认监听 http://127.0.0.1:8787。MCP Server 使用 stdio transport，适合配置到支持 MCP 的 Agent 中。默认使用 Node 内置 SQLite，数据保存到 `~/.open-continuity/memories.db`，无需安装独立数据库服务；团队部署可切换到 PostgreSQL。运行环境要求 Node.js 22.13 或更高版本。
 
-准备 Developer Preview 时运行 `npm run release:check`；该命令会完成类型检查、完整测试、生产依赖审计、包内容检查，以及从真实 tarball 隔离安装后的双 Agent MCP 演示。性能基准说明见 [Lite benchmark](./docs/benchmarking.md)，外部发布步骤和权限边界见[发布检查清单](./docs/release-checklist.md)。版本变化记录在 [CHANGELOG](./CHANGELOG.md)。
+准备 Developer Preview 时运行 `npm run release:check`；该命令会完成类型检查、完整测试、正式评测、生产依赖审计、包内容检查，以及从真实 tarball 隔离安装后的双 Agent MCP 演示、Claude Adapter setup/doctor 和数据治理 smoke。性能基准说明见 [Lite benchmark](./docs/benchmarking.md)，外部发布步骤和权限边界见[发布检查清单](./docs/release-checklist.md)。版本变化记录在 [CHANGELOG](./CHANGELOG.md)。
 
 直接启动 MCP：
 
@@ -138,7 +235,29 @@ HTTP 服务默认监听 http://127.0.0.1:8787。MCP Server 使用 stdio transpor
 
 手动配置多个客户端时，必须保持 `OPEN_CONTINUITY_USER_ID` 相同，并为每个客户端设置不同的 `OPEN_CONTINUITY_AGENT_ID`。优先使用 CLI 连接器自动生成和管理这两个身份。
 
-客户端接入后会发现九个工具：原有的 `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`，以及 `memory_handoff_create` 和 `memory_handoff_resume`。`memory_capabilities` 用于发现当前 Profile 和可用能力；`memory_context` 用于一次检索后生成 Context Pack；`memory_query` 用于有预算的多步检索。Agent 是否主动调用这些工具仍由客户端/模型的工具策略决定；当前不自动拦截每一轮完整对话。
+客户端接入后会发现九个工具：原有的 `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`，以及 `memory_handoff_create` 和 `memory_handoff_resume`。`memory_capabilities` 用于发现当前 Profile 和可用能力；`memory_context` 用于一次检索后生成 Context Pack；`memory_query` 用于有预算的多步检索。Agent 是否主动调用这些工具仍由客户端/模型的工具策略决定；Conversation Capture 是独立的显式同步/watch 入口，不依赖模型主动调用 MCP。
+
+## Trae Conversation Capture（实验性）
+
+这个 Adapter 通过本机 Trae 客户端的 app-server 读取用户明确选择同步的已保存 thread。它能看到 app-server 暴露的用户消息、Agent commentary/最终回复、工具调用结果和 compact 标记，但不能获得隐藏思维链，也不代表能观测任何第三方 Agent。
+
+同步后的原始可观测项保存在 `~/.open-continuity/capture.db`，与长期记忆库 `memories.db` 隔离。当前规则提取器只识别“请记住”“以后”“我偏好/希望”“我们决定”等显式中英文信号，并把结果标为 private、pending 候选；普通闲聊不会直接写入长期记忆。完整回合需要同时满足 Trae 状态为 completed、存在用户消息和最终回复；中断或不完整回合会降低候选置信度。
+
+不指定 `--thread` 时，`capture sync --limit 10` 会同步最近的非临时 CLI thread；更谨慎的方式是始终指定 thread ID。重复同步是幂等的。列表同步支持分页，并通过 `--limit`（每页规模）和 `--max-threads` 控制单轮扫描规模；达到上限时会报告截断。`capture watch` 适合前台运行，macOS 用户也可以用 `setup trae` 一次性注册当前用户的 `launchd` 后台服务，再用 `doctor trae` 或 `capture status` 查看服务、checkpoint 与同步健康状态。服务 start/stop/uninstall 可重复执行，停止会二次确认 launchd service 已消失，配置变化会安全重载。同步过程带单实例锁、过期锁清理和有限重试，服务日志位于 `~/.open-continuity/capture-service.log` 与 `~/.open-continuity/capture-service.error.log`。`capture thread` 用于检查 Inbox 实际读取到的规范化内容。`capture approve` 默认写为 private 长期记忆；显式添加 `--share` 才写为默认可被已连接 Agent 召回的 public 共享记忆。跨 Agent 出现完全相同的候选时会合并 evidence；候选与已有记忆高度相似但内容不同时不会自动覆盖，必须显式指定 `--replace-memory` 才创建带 `supersedes` 的新版本。当前仍未实现基于模型的语义提取和条件化偏好自动归并。
+
+## Claude Code Conversation Adapter（实验性）
+
+Claude Adapter 不读取私有内部接口，而是使用 Claude Code 公开的 `UserPromptSubmit` 与 `Stop` Hook 契约。`Stop` 输入提供 `transcript_path` 和最终回复，Adapter 将 JSONL 中可观测的 user、assistant、tool 与 compaction 记录规范化后写入同一个本地 Inbox；由于 transcript 可能异步落盘，最终回复会用 Hook 的 `last_assistant_message` 补齐。OpenContinuity 自己注入的 memory context 与 meta/system reminder 会被过滤，避免形成记忆反馈循环。会话运行中切换到 allowlist 外目录的记录也会逐条跳过。
+
+Claude Capture 由每轮 `Stop` 事件触发，不需要常驻轮询服务；Injection 则在下一轮 `UserPromptSubmit` 发生时执行。Hook 失败时保持 fail open，不阻塞 Claude。当前已通过完全虚构的进程级黑盒测试和安装后 tarball smoke；由于本机没有真实 Claude Code，可用性声明仍限于公开协议兼容，真实客户端 smoke 是 Beta 发布前的环境依赖检查。
+
+## Codex CLI Conversation Adapter（实验性）
+
+Codex Adapter 通过公开的本地 `codex app-server --stdio` JSON-RPC 接口读取线程：先 `initialize`，再用 `thread/list` 找到线程，用 `thread/read` 和 `thread/turns/list` 读取可观测回合；优先使用分页的 `thread/turns/list`，旧版服务不可用时回退到 `thread/read { includeTurns: true }`。用户、assistant、shell/MCP 工具调用和 compaction 会规范化进入同一个 Conversation Inbox；reasoning 只保留类型标记，不保存其内容。
+
+`Stop` Hook 触发当前 session 的 Capture，`UserPromptSubmit` Hook 注入受预算限制的已批准 public 记忆。Hook 配置位于 `$CODEX_HOME/hooks.json`，写入前会备份，重复执行 `setup codex` 不会重复添加处理器。Capture 和 Injection 仍受 workspace allowlist、Inbox/长期记忆隔离和 fail-open 约束。真实本机只读探针、真实持久化 `codex exec` smoke 和真实交互式 `/hooks → Trust all → prompt` smoke 已验证 `codex-cli 0.162.1` 的初始化、线程读取、Injection 回执和 Stop checkpoint；自动化注入断言使用单次 bypass，新进程仍可能需要手动确认 `/hooks`。
+
+效果评测使用仓库内完全虚构的数据集：`npm run eval:golden` 是快速冒烟，`npm run eval:suite` 是正式多轮门禁，`npm run eval:quality` 是语义检索挑战集。正式套件包含 18 个 Capture、13 个 Injection、6 个治理场景，每个场景独立运行 5 轮，共 185 次断言；质量集额外覆盖高相似、近重复、冲突、排序和权限边界。另有 `test/trae-vertical.test.ts` 验证 Trae Capture→审核→轻量 Injection→MCP 深搜纵向链路，不读取真实历史对话。
 
 ## Handoff Capsule
 
@@ -147,7 +266,9 @@ HTTP 服务默认监听 http://127.0.0.1:8787。MCP Server 使用 stdio transpor
 ## 隐私边界
 
 - Lite 默认只在本机 SQLite 中保存数据，不调用外部 embedding 或生成模型。
-- OpenContinuity 不会自动截取完整对话，只处理 Agent 明确调用工具时提交的结构化记忆。
+- MCP 接入不会自动获得完整对话；实验性 Capture Adapter 只能读取 Agent 官方扩展面提供的可观测内容：Trae/Codex 使用本地 app-server，Claude Code 使用 Stop transcript Hook。
+- Conversation Inbox 与长期记忆隔离；候选必须显式批准才进入长期记忆。原始回合默认保留 7 天，并按回合清理与导入前过滤；pending 候选只保留提取后的 evidence，默认 30 天，不会阻止原始对话过期。
+- Injection Receipt 不保存 Prompt 原文，默认保留 30 天且最多 5000 条。`data cleanup` 执行保留策略；`data purge-transient --yes` 清空 Inbox、候选和 Receipt，但不删除长期共享记忆。
 - MCP Server 会向支持说明字段的客户端声明：不得保存凭据、秘密或完整对话。
 - private 记忆默认无法读取；启用前需要显式调整运行时策略。
 - 用户可以查看历史、删除记忆并导出完整事件链。

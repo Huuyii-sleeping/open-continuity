@@ -1,10 +1,31 @@
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { agentNameSchema, ensureConfig, requireConfig, saveConfig } from "./cli/config.js";
+import { agentNameSchema, ensureConfig, normalizeWorkspacePath, requireConfig, saveConfig } from "./cli/config.js";
 import { connectAgent, detectAgents, disconnectAgent } from "./cli/connectors.js";
 import { runDemo } from "./cli/demo.js";
 import { runDoctor } from "./cli/doctor.js";
+import { doctorClaudeAdapter, setupClaudeAdapter, type ClaudeAdapterPaths } from "./cli/claude-adapter.js";
+import { doctorCodexAdapter, setupCodexAdapter, type CodexAdapterPaths } from "./cli/codex-adapter.js";
+import { doctorTraeAdapter, setupTraeAdapter, type TraeAdapterPaths } from "./cli/trae-adapter.js";
+import {
+  approveCaptureCandidate,
+  captureDoctor,
+  inspectCapturedThread,
+  listCaptureCandidates,
+  captureStatus,
+  rejectCaptureCandidate,
+  syncTraeCapture,
+} from "./capture/trae-capture-service.js";
+import { captureCodexStatus, codexCaptureDoctor, syncCodexCapture } from "./capture/codex-capture-service.js";
+import { captureLockStatus } from "./capture/capture-lock.js";
+import { captureServicePaths, installCaptureService, startCaptureService, statusCaptureService, stopCaptureService, uninstallCaptureService } from "./capture/capture-service.js";
+import { watchTraeCapture } from "./capture/trae-watch.js";
+import { ConversationInbox } from "./capture/conversation-inbox.js";
+import { captureDatabasePath } from "./capture/paths.js";
+import { TraeInjectionAdapter } from "./injection/trae-hook-config.js";
+import { CodexInjectionAdapter } from "./injection/codex-hook-config.js";
+import { cleanupInjectionReceipts, injectionReceiptStatus, purgeInjectionReceipts } from "./injection/receipt-store.js";
 import { exportMemoryPackage, importMemoryPackage } from "./package/memory-package.js";
 import { SqliteMemoryStore } from "./sqlite/sqlite-memory-store.js";
 import { backupSqliteDatabase, inspectSqliteDatabase, restoreSqliteDatabase } from "./sqlite/maintenance.js";
@@ -35,7 +56,26 @@ Usage:
   open-continuity demo
   open-continuity connect <trae|claude|codex> [--force]
   open-continuity disconnect <trae|claude|codex>
-  open-continuity doctor
+  open-continuity setup <trae|claude|codex> [--workspace <path>] [--force]
+  open-continuity doctor [trae|claude|codex] [--workspace <path>]
+  open-continuity injection status
+  open-continuity injection enable <workspace>
+  open-continuity injection disable
+  open-continuity injection check-hook
+  open-continuity injection install-hook
+  open-continuity capture doctor [--source trae|codex]
+  open-continuity capture status [--source trae|claude|codex]
+  open-continuity capture enable <workspace>
+  open-continuity capture disable
+  open-continuity capture service <install|start|stop|status|uninstall>
+  open-continuity capture sync [--source trae|codex] [--thread <thread-id>] [--limit n]
+  open-continuity capture candidates [--status pending|approved|rejected] [--limit n]
+  open-continuity capture thread <thread-id> [--source trae|claude|codex]
+  open-continuity capture approve <candidate-id> [--share] [--replace-memory <memory-id>]
+  open-continuity capture reject <candidate-id>
+  open-continuity data status
+  open-continuity data cleanup
+  open-continuity data purge-transient --yes
   open-continuity database check
   open-continuity database backup --output <file>
   open-continuity database restore <backup-file> [--output <file>] --yes
@@ -67,7 +107,37 @@ async function main(): Promise<void> {
     return;
   }
 
-  const config = requireConfig();
+  const runtimeDirectory = dirname(fileURLToPath(import.meta.url));
+  const traeAdapterPaths: TraeAdapterPaths = {
+    cliPath: join(dirname(fileURLToPath(import.meta.url)), "cli.js"), serverPath,
+    injectionHookPath: join(dirname(fileURLToPath(import.meta.url)), "injection-hook.js"), nodePath: process.execPath,
+  };
+  const claudeAdapterPaths: ClaudeAdapterPaths = {
+    serverPath, nodePath: process.execPath,
+    injectionHookPath: join(runtimeDirectory, "claude-injection-hook.js"),
+    captureHookPath: join(runtimeDirectory, "claude-capture-hook.js"),
+  };
+  const codexAdapterPaths: CodexAdapterPaths = {
+    serverPath, nodePath: process.execPath,
+    injectionHookPath: join(runtimeDirectory, "codex-injection-hook.js"),
+    captureHookPath: join(runtimeDirectory, "codex-capture-hook.js"),
+  };
+  const requestedInjectionAgent = option("agent") || option("source") || "trae";
+  const injectionAdapter = requestedInjectionAgent === "codex"
+    ? new CodexInjectionAdapter(process.env, process.execPath, codexAdapterPaths)
+    : new TraeInjectionAdapter(process.env, process.execPath, traeAdapterPaths.injectionHookPath);
+  const config = command === "setup" ? ensureConfig().config : requireConfig();
+  if (command === "setup") {
+    const workspace = option("workspace") || process.cwd();
+    const result = subcommand === "trae"
+      ? await setupTraeAdapter(config, traeAdapterPaths, { workspace, force: flag("force") })
+      : subcommand === "claude"
+        ? await setupClaudeAdapter(config, claudeAdapterPaths, { workspace, force: flag("force") })
+        : subcommand === "codex"
+          ? await setupCodexAdapter(config, codexAdapterPaths, { workspace, force: flag("force") })
+        : (() => { throw new Error(`Unknown setup target: ${subcommand || ""}`); })();
+    output(result); if (!result.ok) process.exitCode = 1; return;
+  }
   if (command === "connect") {
     const agent = agentNameSchema.parse(subcommand);
     output({ ok: true, operation: "connect", agent, ...connectAgent(agent, config, serverPath, process.env, flag("force")) });
@@ -78,7 +148,185 @@ async function main(): Promise<void> {
     disconnectAgent(agent, config); output({ ok: true, operation: "disconnect", agent }); return;
   }
   if (command === "doctor") {
+    if (subcommand === "trae") {
+      const result = await doctorTraeAdapter(config, traeAdapterPaths, process.env, option("workspace"));
+      output(result); if (!result.ok) process.exitCode = 1; return;
+    }
+    if (subcommand === "claude") {
+      const result = await doctorClaudeAdapter(config, claudeAdapterPaths, process.env, option("workspace"));
+      output(result); if (!result.ok) process.exitCode = 1; return;
+    }
+    if (subcommand === "codex") {
+      const result = await doctorCodexAdapter(config, codexAdapterPaths, process.env, option("workspace"));
+      output(result); if (!result.ok) process.exitCode = 1; return;
+    }
+    if (subcommand) throw new Error(`Unknown doctor target: ${subcommand}`);
     const result = await runDoctor(config, serverPath); output(result); if (!result.ok) process.exitCode = 1; return;
+  }
+  if (command === "injection") {
+    if (subcommand === "status") {
+      output({
+        ok: true, operation: "injection_status", config: config.injection,
+        hook: { event: injectionAdapter.hookEvent, ...injectionAdapter.check() },
+      });
+      return;
+    }
+    if (subcommand === "enable") {
+      const workspace = commandArgs[2]; if (!workspace) throw new Error("workspace is required");
+      const normalized = normalizeWorkspacePath(workspace);
+      const workspaces = [...new Set([...config.injection.workspaces.map(normalizeWorkspacePath), normalized])];
+      config.injection = { ...config.injection, enabled: true, workspaces };
+      saveConfig(config);
+      output({ ok: true, operation: "injection_enable", config: config.injection });
+      return;
+    }
+    if (subcommand === "disable") {
+      config.injection = { ...config.injection, enabled: false };
+      saveConfig(config);
+      output({ ok: true, operation: "injection_disable", config: config.injection });
+      return;
+    }
+    if (subcommand === "check-hook") {
+      const result = injectionAdapter.check();
+      output({ ok: result.valid && result.installed, operation: "injection_check_hook", ...result });
+      if (!result.valid || !result.installed) process.exitCode = 1;
+      return;
+    }
+    if (subcommand === "install-hook") {
+      const result = injectionAdapter.install();
+      output({ ok: true, operation: "injection_install_hook", ...result });
+      return;
+    }
+    throw new Error(`Unknown injection command: ${subcommand || ""}`);
+  }
+  if (command === "capture") {
+    if (subcommand === "doctor") {
+      const source = z.enum(["trae", "codex"]).parse(option("source") || "trae");
+      const result = source === "codex" ? codexCaptureDoctor() : captureDoctor();
+      output(result); if (!result.ok) process.exitCode = 1; return;
+    }
+    if (subcommand === "status") {
+      const source = z.enum(["trae", "claude", "codex"]).parse(option("source") || "trae");
+      const status = source === "codex" ? captureCodexStatus(process.env) : captureStatus(process.env, source);
+      output({ ok: true, operation: "capture_status", config: config.capture, ...status,
+        ...(source === "trae" ? { lock: captureLockStatus(), service: statusCaptureService() } : {}) });
+      return;
+    }
+    if (subcommand === "enable") {
+      const workspace = commandArgs[2]; if (!workspace) throw new Error("workspace is required");
+      const normalized = normalizeWorkspacePath(workspace);
+      const workspaces = [...new Set([...config.capture.workspaces.map(normalizeWorkspacePath), normalized])];
+      config.capture = { ...config.capture, enabled: true, workspaces };
+      saveConfig(config);
+      output({ ok: true, operation: "capture_enable", config: config.capture });
+      return;
+    }
+    if (subcommand === "disable") {
+      config.capture = { ...config.capture, enabled: false };
+      saveConfig(config);
+      output({ ok: true, operation: "capture_disable", config: config.capture });
+      return;
+    }
+    if (subcommand === "service") {
+      const serviceOperation = commandArgs[2];
+      if (serviceOperation === "install") {
+        const captureConfig = config.capture;
+        output({ ok: true, operation: "capture_service_install", ...installCaptureService({ nodePath: process.execPath, cliPath: join(dirname(fileURLToPath(import.meta.url)), "cli.js"), config: { intervalMs: captureConfig.intervalMs, pageSize: captureConfig.pageSize, maxThreads: captureConfig.maxThreads, retryLimit: captureConfig.retryLimit } }) });
+        return;
+      }
+      if (serviceOperation === "start") { output({ ok: true, operation: "capture_service_start", ...startCaptureService() }); return; }
+      if (serviceOperation === "stop") { output({ ok: true, operation: "capture_service_stop", ...stopCaptureService() }); return; }
+      if (serviceOperation === "status") { output({ ok: true, operation: "capture_service_status", ...statusCaptureService(), paths: captureServicePaths() }); return; }
+      if (serviceOperation === "uninstall") { output({ ok: true, operation: "capture_service_uninstall", ...uninstallCaptureService() }); return; }
+      throw new Error("Unknown capture service operation: " + (serviceOperation || ""));
+    }
+    if (subcommand === "sync") {
+      const source = z.enum(["trae", "codex"]).parse(option("source") || "trae");
+      const limit = z.coerce.number().int().min(1).max(100).parse(option("limit") || 10);
+      const maxThreads = z.coerce.number().int().min(1).max(1000).parse(option("max-threads") || config.capture.maxThreads);
+      const result = source === "codex"
+        ? await syncCodexCapture({ threadId: option("thread"), limit, maxThreads })
+        : await syncTraeCapture({ threadId: option("thread"), limit, maxThreads });
+      output({ ok: true, operation: "capture_sync", ...result }); return;
+    }
+    if (subcommand === "watch") {
+      const limit = z.coerce.number().int().min(1).max(100).parse(option("limit") || 10);
+      const intervalMs = z.coerce.number().int().min(1000).max(86_400_000).parse(option("interval") || config.capture.intervalMs);
+      const maxThreads = z.coerce.number().int().min(1).max(1000).parse(option("max-threads") || config.capture.maxThreads);
+      const retryLimit = z.coerce.number().int().min(0).max(10).parse(option("retry-limit") || config.capture.retryLimit);
+      const controller = new AbortController();
+      const stop = () => controller.abort();
+      process.once("SIGINT", stop); process.once("SIGTERM", stop);
+      try {
+        await watchTraeCapture({ limit, intervalMs, maxThreads, retryLimit, once: flag("once"), onCycle: (result) => output({ ok: true, operation: "capture_watch_cycle", ...result }) }, process.env, controller.signal);
+      } finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); }
+      return;
+    }
+    if (subcommand === "candidates") {
+      const status = option("status");
+      output(listCaptureCandidates({
+        status: status ? z.enum(["pending", "approved", "rejected"]).parse(status) : undefined,
+        limit: z.coerce.number().int().min(1).max(500).parse(option("limit") || 50),
+      }, process.env, { memoryDatabasePath: config.databasePath, userId: config.userId }));
+      return;
+    }
+    if (subcommand === "thread") {
+      const threadId = commandArgs[2]; if (!threadId) throw new Error("thread-id is required");
+      const source = z.enum(["trae", "claude", "codex"]).parse(option("source") || "trae");
+      output({ ok: true, operation: "capture_thread", source, ...inspectCapturedThread(threadId, process.env, source) }); return;
+    }
+    const candidateId = commandArgs[2];
+    if (!candidateId) throw new Error("candidate-id is required");
+    if (subcommand === "approve") {
+      output({ ok: true, operation: "capture_approve", ...await approveCaptureCandidate(candidateId, config, flag("share") ? "public" : "private", process.env, option("replace-memory")) }); return;
+    }
+    if (subcommand === "reject") { output({ ok: true, operation: "capture_reject", candidate: rejectCaptureCandidate(candidateId) }); return; }
+    throw new Error("Unknown capture command: " + (subcommand || ""));
+  }
+  if (command === "data") {
+    const inbox = new ConversationInbox(captureDatabasePath());
+    try {
+      if (subcommand === "status") {
+        output({
+          ok: true,
+          operation: "data_status",
+          policies: {
+            conversationRetentionDays: config.capture.retentionDays,
+            pendingCandidateRetentionDays: config.capture.pendingCandidateRetentionDays,
+            receiptRetentionDays: config.injection.receiptRetentionDays,
+            maxReceipts: config.injection.maxReceipts,
+          },
+          inbox: { path: captureDatabasePath(), ...inbox.governanceStatus() },
+          receipts: injectionReceiptStatus(),
+          longTermMemory: { path: config.databasePath, preservedByTransientCleanup: true },
+        });
+        return;
+      }
+      if (subcommand === "cleanup") {
+        output({
+          ok: true,
+          operation: "data_cleanup",
+          inbox: inbox.cleanupExpired(config.capture.retentionDays, Date.now(), config.capture.pendingCandidateRetentionDays),
+          receipts: cleanupInjectionReceipts(process.env, config.injection),
+          longTermMemoryPreserved: true,
+        });
+        return;
+      }
+      if (subcommand === "purge-transient") {
+        if (!flag("yes")) throw new Error("Refusing to purge transient Capture and Receipt data without --yes");
+        output({
+          ok: true,
+          operation: "data_purge_transient",
+          inbox: inbox.purgeInbox(),
+          receipts: purgeInjectionReceipts(),
+          longTermMemoryPreserved: true,
+        });
+        return;
+      }
+      throw new Error(`Unknown data command: ${subcommand || ""}`);
+    } finally {
+      inbox.close();
+    }
   }
   if (command === "database") {
     if (subcommand === "check") { output(inspectSqliteDatabase(config.databasePath)); return; }
