@@ -7,14 +7,16 @@ import { z } from "zod";
 export const agentNameSchema = z.enum(["trae", "claude", "codex"]);
 export type AgentName = z.infer<typeof agentNameSchema>;
 
-const defaultInjectionConfig = { enabled: false, workspaces: [] as string[], tokenBudget: 800, maxMemories: 8, timeoutMs: 200 };
-const defaultCaptureConfig = { retentionDays: 7, autoCleanup: true, intervalMs: 5000, pageSize: 20, maxThreads: 100, retryLimit: 3 };
+const defaultInjectionConfig = { enabled: false, workspaces: [] as string[], tokenBudget: 800, maxMemories: 8, timeoutMs: 200, receiptRetentionDays: 30, maxReceipts: 5000 };
+const defaultCaptureConfig = { enabled: false, workspaces: [] as string[], retentionDays: 7, pendingCandidateRetentionDays: 30, autoCleanup: true, intervalMs: 5000, pageSize: 20, maxThreads: 100, retryLimit: 3 };
 const injectionConfigSchema = z.object({
   enabled: z.boolean().default(false),
   workspaces: z.array(z.string().min(1)).default([]),
   tokenBudget: z.number().int().min(64).max(800).default(800),
   maxMemories: z.number().int().min(1).max(8).default(8),
   timeoutMs: z.number().int().min(25).max(200).default(200),
+  receiptRetentionDays: z.number().int().min(1).max(3650).default(30),
+  maxReceipts: z.number().int().min(100).max(100_000).default(5000),
 });
 export type InjectionConfig = z.infer<typeof injectionConfigSchema>;
 
@@ -26,7 +28,10 @@ const configSchema = z.object({
   })).default({}),
   injection: injectionConfigSchema.default(defaultInjectionConfig),
   capture: z.object({
+    enabled: z.boolean().default(false),
+    workspaces: z.array(z.string().min(1)).default([]),
     retentionDays: z.number().int().min(1).max(3650).default(7),
+    pendingCandidateRetentionDays: z.number().int().min(1).max(3650).default(30),
     autoCleanup: z.boolean().default(true),
     intervalMs: z.number().int().min(1000).max(86_400_000).default(5000),
     pageSize: z.number().int().min(1).max(100).default(20),
@@ -43,6 +48,14 @@ export function continuityHome(env: NodeJS.ProcessEnv = process.env): string {
 export function normalizeWorkspacePath(path: string): string {
   const resolved = resolve(path);
   try { return realpathSync(resolved); } catch { return resolved; }
+}
+
+export function isWorkspaceAllowed(workspaces: string[], path: string): boolean {
+  const workspace = normalizeWorkspacePath(path);
+  return workspaces.some((allowed) => {
+    const normalized = normalizeWorkspacePath(allowed);
+    return workspace === normalized || workspace.startsWith(normalized.endsWith("/") ? normalized : normalized + "/");
+  });
 }
 
 export function configPath(env: NodeJS.ProcessEnv = process.env): string { return join(continuityHome(env), "config.json"); }

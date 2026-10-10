@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { z } from "zod";
 import { findExecutable } from "../cli/connectors.js";
 import type { ConversationItem, ConversationThread, ConversationTurn } from "./types.js";
+import type { CaptureAdapter, CaptureListResult, CaptureThreadReference } from "../adapters/contracts.js";
 
 const userInputSchema = z.object({ type: z.string(), text: z.string().optional() }).passthrough();
 const threadItemSchema = z.object({ id: z.string(), type: z.string() }).passthrough();
@@ -90,7 +91,8 @@ export function probeTraeCapture(env: NodeJS.ProcessEnv = process.env): TraeCapt
     ...(appServer ? {} : { detail: "This Trae installation does not expose app-server" }) };
 }
 
-export class TraeAppServerClient {
+export class TraeAppServerClient implements CaptureAdapter {
+  readonly id = "trae";
   private process: ChildProcessWithoutNullStreams | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, PendingRequest>();
@@ -109,7 +111,7 @@ export class TraeAppServerClient {
     this.notify("initialized", {});
   }
 
-  async listThreads(input: { pageSize?: number; maxThreads?: number } = {}): Promise<{ threads: Array<z.infer<typeof threadSchema>>; pages: number; truncated: boolean }> {
+  async listThreads(input: { pageSize?: number; maxThreads?: number } = {}): Promise<CaptureListResult> {
     const pageSize = input.pageSize ?? 20;
     const maxThreads = input.maxThreads ?? 100;
     const threads: Array<z.infer<typeof threadSchema>> = [];
@@ -125,7 +127,10 @@ export class TraeAppServerClient {
       threads.push(...result.data);
       cursor = result.nextCursor ?? undefined;
     } while (cursor && threads.length < maxThreads);
-    return { threads: threads.slice(0, maxThreads), pages, truncated: Boolean(cursor) };
+    const references: CaptureThreadReference[] = threads.slice(0, maxThreads).map((thread) => ({
+      id: thread.id, cwd: thread.cwd, updatedAt: timestamp(thread.updatedAt)!, ephemeral: thread.ephemeral,
+    }));
+    return { threads: references, pages, truncated: Boolean(cursor) };
   }
 
   async readThread(threadId: string): Promise<ConversationThread> {

@@ -69,7 +69,7 @@ function sameCandidate(actual: { kind: MemoryKind; value: string }, expected: Qu
 function evaluateCapture(testCase: QualityCaptureCase, round: number): QualityCaseResult {
   const rawItem: ConversationItem = { id: `${testCase.id}-${round}`, type: testCase.type as ConversationItem["type"], text: testCase.text, rawType: "qualityDataset" };
   const sanitized = sanitizeConversationItem(rawItem);
-  const candidates = extractMemoryCandidates({ threadId: `quality-thread-${round}`, turnId: testCase.id, quality: testCase.quality, item: sanitized.item, now: "2030-01-01T00:00:00.000Z" });
+  const candidates = extractMemoryCandidates({ source: "trae", threadId: `quality-thread-${round}`, turnId: testCase.id, quality: testCase.quality, item: sanitized.item, now: "2030-01-01T00:00:00.000Z" });
   const exactSet = candidates.length === testCase.expected.length && testCase.expected.every((expected) => candidates.some((candidate) => sameCandidate(candidate, expected)));
   const confidenceSafe = testCase.expected.every((expected) => expected.maxConfidence === undefined || candidates.filter((candidate) => sameCandidate(candidate, expected)).every((candidate) => candidate.confidence <= expected.maxConfidence!));
   const passed = exactSet && confidenceSafe;

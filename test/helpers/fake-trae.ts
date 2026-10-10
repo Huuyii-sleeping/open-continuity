@@ -33,10 +33,11 @@ if (args[0] === "app-server" && args.includes("--help")) {
 }
 if (args[0] !== "app-server") process.exit(2);
 
+const workspace = process.env.TEST_TRAE_WORKSPACE || "/tmp/fictional-capture-workspace";
 const thread = {
   id: "thread-fictional-capture",
   sessionId: "session-fictional-capture",
-  cwd: "/tmp/fictional-capture-workspace",
+  cwd: workspace,
   cliVersion: "9.9.9-fictional",
   preview: "A fictional preference capture test",
   createdAt: 1_800_000_000,
@@ -50,7 +51,7 @@ const thread = {
     items: [
       { id: "item-user", type: "userMessage", content: [{ type: "text", text: "我偏好先给结论，再列出验证结果。" }] },
       { id: "item-commentary", type: "agentMessage", phase: "commentary", text: "正在处理虚构测试。" },
-      { id: "item-tool", type: "commandExecution", command: "printf fictional", cwd: "/tmp/fictional-capture-workspace", aggregatedOutput: "fictional", status: "completed" },
+      { id: "item-tool", type: "commandExecution", command: "printf fictional", cwd: workspace, aggregatedOutput: "fictional", status: "completed" },
       { id: "item-final", type: "agentMessage", phase: "final_answer", text: "收到，这是虚构测试。" }
     ]
   }]

@@ -75,9 +75,11 @@ describe("CLI", () => {
   it("syncs, reviews, and approves a fictional Trae conversation candidate", () => {
     const root = mkdtempSync(join(tmpdir(), "open-continuity-cli-capture-")); directories.push(root);
     const bin = installFakeTraeCli(root);
-    const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), PATH: `${bin}${delimiter}${process.env.PATH || ""}` };
+    const workspace = join(root, "fictional-workspace");
+    const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), TEST_TRAE_WORKSPACE: workspace, PATH: `${bin}${delimiter}${process.env.PATH || ""}` };
     const cli = join(process.cwd(), "dist/src/cli.js");
     execFileSync(process.execPath, [cli, "init", "--json"], { env, encoding: "utf8" });
+    execFileSync(process.execPath, [cli, "capture", "enable", workspace, "--json"], { env, encoding: "utf8" });
 
     const doctor = JSON.parse(execFileSync(process.execPath, [cli, "capture", "doctor", "--json"], { env, encoding: "utf8" }));
     expect(doctor).toMatchObject({ ok: true, readiness: "ready_for_sync_or_watch" });
@@ -128,20 +130,21 @@ describe("CLI", () => {
     const workspace = join(root, "fictional-workspace");
     const env = {
       ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), TRAECLI_HOME: join(root, "trae-cli"),
-      TEST_STATE_DIR: join(root, "state"), PATH: `${bin}${delimiter}${process.env.PATH || ""}`,
+      TEST_STATE_DIR: join(root, "state"), TEST_TRAE_WORKSPACE: workspace, PATH: `${bin}${delimiter}${process.env.PATH || ""}`,
     };
     const cli = join(process.cwd(), "dist/src/cli.js");
 
     const first = JSON.parse(execFileSync(process.execPath, [cli, "setup", "trae", "--workspace", workspace, "--json"], { env, encoding: "utf8" }));
     expect(first).toMatchObject({
       ok: true, operation: "setup_trae", workspace,
-      steps: { mcp: { changed: true }, injection: { enabled: true, hookChanged: true }, captureService: { installed: true, status: "running", alreadyRunning: false } },
+      steps: { mcp: { changed: true }, injection: { enabled: true, hookChanged: true }, capture: { enabled: true, workspaces: [workspace] }, captureService: { installed: true, status: "running", alreadyRunning: false } },
       doctor: { adapter: "trae", ok: true },
     });
     expect(first.doctor.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: "Trae installation", status: "pass" }),
       expect.objectContaining({ name: "Trae MCP connector", status: "pass" }),
       expect.objectContaining({ name: "Trae UserPromptSubmit hook", status: "pass" }),
+      expect.objectContaining({ name: "Capture allowlist", status: "pass" }),
       expect.objectContaining({ name: "Capture background service", status: "pass" }),
       expect.objectContaining({ name: "Trae Hook trust", status: "warn" }),
     ]));
@@ -171,7 +174,10 @@ describe("CLI", () => {
     const cli = join(process.cwd(), "dist/src/cli.js");
     execFileSync(process.execPath, [cli, "init", "--json"], { env, encoding: "utf8" });
     const status = JSON.parse(execFileSync(process.execPath, [cli, "capture", "status", "--json"], { env, encoding: "utf8" }));
-    expect(status).toMatchObject({ ok: true, operation: "capture_status", lock: { locked: false }, service: { installed: false, running: false } });
+    expect(status).toMatchObject({ ok: true, operation: "capture_status", config: { enabled: false, workspaces: [] }, lock: { locked: false }, service: { installed: false, running: false } });
+    const workspace = join(root, "fictional-workspace");
+    const enabled = JSON.parse(execFileSync(process.execPath, [cli, "capture", "enable", workspace, "--json"], { env, encoding: "utf8" }));
+    expect(enabled).toMatchObject({ ok: true, operation: "capture_enable", config: { enabled: true, workspaces: [workspace] } });
     const installed = JSON.parse(execFileSync(process.execPath, [cli, "capture", "service", "install", "--json"], { env, encoding: "utf8" }));
     expect(installed).toMatchObject({ ok: true, operation: "capture_service_install", installed: true });
     expect(existsSync(installed.paths.plistPath)).toBe(true);
@@ -179,5 +185,7 @@ describe("CLI", () => {
     expect(serviceStatus).toMatchObject({ ok: true, operation: "capture_service_status", installed: true, running: false });
     const removed = JSON.parse(execFileSync(process.execPath, [cli, "capture", "service", "uninstall", "--json"], { env, encoding: "utf8" }));
     expect(removed).toMatchObject({ ok: true, operation: "capture_service_uninstall", installed: false });
+    const disabled = JSON.parse(execFileSync(process.execPath, [cli, "capture", "disable", "--json"], { env, encoding: "utf8" }));
+    expect(disabled).toMatchObject({ ok: true, operation: "capture_disable", config: { enabled: false, workspaces: [workspace] } });
   }, 15_000);
 });

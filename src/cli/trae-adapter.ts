@@ -1,11 +1,11 @@
 import { existsSync } from "node:fs";
-import { normalizeWorkspacePath, saveConfig, type LocalConfig } from "./config.js";
+import { isWorkspaceAllowed, normalizeWorkspacePath, saveConfig, type LocalConfig } from "./config.js";
 import { connectAgent, connectorStatus } from "./connectors.js";
 import { runDoctor, type DoctorCheck } from "./doctor.js";
 import { captureLockStatus } from "../capture/capture-lock.js";
 import { captureServiceSupported, installCaptureService, startCaptureService, statusCaptureService, stopCaptureService } from "../capture/capture-service.js";
 import { captureDoctor, captureStatus } from "../capture/trae-capture-service.js";
-import { checkTraeInjectionHook, installTraeInjectionHook } from "../injection/trae-hook-config.js";
+import { TraeInjectionAdapter } from "../injection/trae-hook-config.js";
 import { SqliteMemoryStore } from "../sqlite/sqlite-memory-store.js";
 
 export interface TraeAdapterPaths {
@@ -39,16 +39,23 @@ export async function doctorTraeAdapter(
   checks.push(...generic.checks.filter((entry) => ["MCP startup", "Tool discovery", "Capability probe", "Database read probe"].includes(entry.name))
     .map((entry) => ({ ...entry, name: `OpenContinuity ${entry.name}` })));
 
-  const hook = checkTraeInjectionHook(env, paths.nodePath, paths.injectionHookPath);
+  const injectionAdapter = new TraeInjectionAdapter(env, paths.nodePath, paths.injectionHookPath);
+  const hook = injectionAdapter.check();
   checks.push(check("Trae UserPromptSubmit hook", hook.valid && hook.installed && existsSync(paths.injectionHookPath) ? "pass" : "fail",
     hook.valid && hook.installed ? (existsSync(paths.injectionHookPath) ? hook.path : `hook entry exists but executable is missing: ${paths.injectionHookPath}`) : hook.detail || "not installed"));
 
   const normalizedWorkspace = workspace ? normalizeWorkspacePath(workspace) : undefined;
   const workspaceAllowed = normalizedWorkspace
-    ? config.injection.workspaces.some((allowed) => normalizedWorkspace === normalizeWorkspacePath(allowed) || normalizedWorkspace.startsWith(normalizeWorkspacePath(allowed) + "/"))
+    ? isWorkspaceAllowed(config.injection.workspaces, normalizedWorkspace)
     : config.injection.workspaces.length > 0;
   checks.push(check("Injection allowlist", config.injection.enabled && workspaceAllowed ? "pass" : "fail",
     !config.injection.enabled ? "injection is disabled" : normalizedWorkspace && !workspaceAllowed ? `${normalizedWorkspace} is not allowlisted` : `${config.injection.workspaces.length} workspace(s) allowlisted`));
+
+  const captureWorkspaceAllowed = normalizedWorkspace
+    ? isWorkspaceAllowed(config.capture.workspaces, normalizedWorkspace)
+    : config.capture.workspaces.length > 0;
+  checks.push(check("Capture allowlist", config.capture.enabled && captureWorkspaceAllowed ? "pass" : "fail",
+    !config.capture.enabled ? "capture is disabled" : normalizedWorkspace && !captureWorkspaceAllowed ? `${normalizedWorkspace} is not allowlisted` : `${config.capture.workspaces.length} workspace(s) allowlisted`));
 
   const serviceSupported = captureServiceSupported(env);
   const service = statusCaptureService(env);
@@ -94,8 +101,10 @@ export async function setupTraeAdapter(
     mcp = { changed: true, ...connectAgent("trae", config, paths.serverPath, env, Boolean(input.force || managed)) };
   }
 
-  const hook = installTraeInjectionHook(env, paths.nodePath, paths.injectionHookPath);
+  const injectionAdapter = new TraeInjectionAdapter(env, paths.nodePath, paths.injectionHookPath);
+  const hook = injectionAdapter.install();
   config.injection = { ...config.injection, enabled: true, workspaces: [...new Set([...config.injection.workspaces.map(normalizeWorkspacePath), workspace])] };
+  config.capture = { ...config.capture, enabled: true, workspaces: [...new Set([...config.capture.workspaces.map(normalizeWorkspacePath), workspace])] };
   saveConfig(config, env);
   const serviceAvailable = captureServiceSupported(env);
   let captureService: Record<string, unknown>;
@@ -118,6 +127,7 @@ export async function setupTraeAdapter(
       captureCapability: { ok: true, version: capabilities.capabilities.version },
       mcp,
       injection: { enabled: true, hookChanged: hook.changed, hookPath: hook.path },
+      capture: { enabled: true, workspaces: config.capture.workspaces },
       captureService,
     },
     doctor,

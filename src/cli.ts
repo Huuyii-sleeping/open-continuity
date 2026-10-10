@@ -5,6 +5,8 @@ import { agentNameSchema, ensureConfig, normalizeWorkspacePath, requireConfig, s
 import { connectAgent, detectAgents, disconnectAgent } from "./cli/connectors.js";
 import { runDemo } from "./cli/demo.js";
 import { runDoctor } from "./cli/doctor.js";
+import { doctorClaudeAdapter, setupClaudeAdapter, type ClaudeAdapterPaths } from "./cli/claude-adapter.js";
+import { doctorCodexAdapter, setupCodexAdapter, type CodexAdapterPaths } from "./cli/codex-adapter.js";
 import { doctorTraeAdapter, setupTraeAdapter, type TraeAdapterPaths } from "./cli/trae-adapter.js";
 import {
   approveCaptureCandidate,
@@ -15,10 +17,15 @@ import {
   rejectCaptureCandidate,
   syncTraeCapture,
 } from "./capture/trae-capture-service.js";
+import { captureCodexStatus, codexCaptureDoctor, syncCodexCapture } from "./capture/codex-capture-service.js";
 import { captureLockStatus } from "./capture/capture-lock.js";
 import { captureServicePaths, installCaptureService, startCaptureService, statusCaptureService, stopCaptureService, uninstallCaptureService } from "./capture/capture-service.js";
 import { watchTraeCapture } from "./capture/trae-watch.js";
-import { checkTraeInjectionHook, installTraeInjectionHook } from "./injection/trae-hook-config.js";
+import { ConversationInbox } from "./capture/conversation-inbox.js";
+import { captureDatabasePath } from "./capture/paths.js";
+import { TraeInjectionAdapter } from "./injection/trae-hook-config.js";
+import { CodexInjectionAdapter } from "./injection/codex-hook-config.js";
+import { cleanupInjectionReceipts, injectionReceiptStatus, purgeInjectionReceipts } from "./injection/receipt-store.js";
 import { exportMemoryPackage, importMemoryPackage } from "./package/memory-package.js";
 import { SqliteMemoryStore } from "./sqlite/sqlite-memory-store.js";
 import { backupSqliteDatabase, inspectSqliteDatabase, restoreSqliteDatabase } from "./sqlite/maintenance.js";
@@ -49,21 +56,26 @@ Usage:
   open-continuity demo
   open-continuity connect <trae|claude|codex> [--force]
   open-continuity disconnect <trae|claude|codex>
-  open-continuity setup trae [--workspace <path>] [--force]
-  open-continuity doctor [trae] [--workspace <path>]
+  open-continuity setup <trae|claude|codex> [--workspace <path>] [--force]
+  open-continuity doctor [trae|claude|codex] [--workspace <path>]
   open-continuity injection status
   open-continuity injection enable <workspace>
   open-continuity injection disable
   open-continuity injection check-hook
   open-continuity injection install-hook
-  open-continuity capture doctor
-  open-continuity capture status
+  open-continuity capture doctor [--source trae|codex]
+  open-continuity capture status [--source trae|claude|codex]
+  open-continuity capture enable <workspace>
+  open-continuity capture disable
   open-continuity capture service <install|start|stop|status|uninstall>
-  open-continuity capture sync [--thread <thread-id>] [--limit n]
+  open-continuity capture sync [--source trae|codex] [--thread <thread-id>] [--limit n]
   open-continuity capture candidates [--status pending|approved|rejected] [--limit n]
-  open-continuity capture thread <thread-id>
-  open-continuity capture approve <candidate-id> [--share]
+  open-continuity capture thread <thread-id> [--source trae|claude|codex]
+  open-continuity capture approve <candidate-id> [--share] [--replace-memory <memory-id>]
   open-continuity capture reject <candidate-id>
+  open-continuity data status
+  open-continuity data cleanup
+  open-continuity data purge-transient --yes
   open-continuity database check
   open-continuity database backup --output <file>
   open-continuity database restore <backup-file> [--output <file>] --yes
@@ -95,14 +107,35 @@ async function main(): Promise<void> {
     return;
   }
 
-  const adapterPaths: TraeAdapterPaths = {
+  const runtimeDirectory = dirname(fileURLToPath(import.meta.url));
+  const traeAdapterPaths: TraeAdapterPaths = {
     cliPath: join(dirname(fileURLToPath(import.meta.url)), "cli.js"), serverPath,
     injectionHookPath: join(dirname(fileURLToPath(import.meta.url)), "injection-hook.js"), nodePath: process.execPath,
   };
+  const claudeAdapterPaths: ClaudeAdapterPaths = {
+    serverPath, nodePath: process.execPath,
+    injectionHookPath: join(runtimeDirectory, "claude-injection-hook.js"),
+    captureHookPath: join(runtimeDirectory, "claude-capture-hook.js"),
+  };
+  const codexAdapterPaths: CodexAdapterPaths = {
+    serverPath, nodePath: process.execPath,
+    injectionHookPath: join(runtimeDirectory, "codex-injection-hook.js"),
+    captureHookPath: join(runtimeDirectory, "codex-capture-hook.js"),
+  };
+  const requestedInjectionAgent = option("agent") || option("source") || "trae";
+  const injectionAdapter = requestedInjectionAgent === "codex"
+    ? new CodexInjectionAdapter(process.env, process.execPath, codexAdapterPaths)
+    : new TraeInjectionAdapter(process.env, process.execPath, traeAdapterPaths.injectionHookPath);
   const config = command === "setup" ? ensureConfig().config : requireConfig();
   if (command === "setup") {
-    if (subcommand !== "trae") throw new Error(`Unknown setup target: ${subcommand || ""}`);
-    const result = await setupTraeAdapter(config, adapterPaths, { workspace: option("workspace") || process.cwd(), force: flag("force") });
+    const workspace = option("workspace") || process.cwd();
+    const result = subcommand === "trae"
+      ? await setupTraeAdapter(config, traeAdapterPaths, { workspace, force: flag("force") })
+      : subcommand === "claude"
+        ? await setupClaudeAdapter(config, claudeAdapterPaths, { workspace, force: flag("force") })
+        : subcommand === "codex"
+          ? await setupCodexAdapter(config, codexAdapterPaths, { workspace, force: flag("force") })
+        : (() => { throw new Error(`Unknown setup target: ${subcommand || ""}`); })();
     output(result); if (!result.ok) process.exitCode = 1; return;
   }
   if (command === "connect") {
@@ -116,7 +149,15 @@ async function main(): Promise<void> {
   }
   if (command === "doctor") {
     if (subcommand === "trae") {
-      const result = await doctorTraeAdapter(config, adapterPaths, process.env, option("workspace"));
+      const result = await doctorTraeAdapter(config, traeAdapterPaths, process.env, option("workspace"));
+      output(result); if (!result.ok) process.exitCode = 1; return;
+    }
+    if (subcommand === "claude") {
+      const result = await doctorClaudeAdapter(config, claudeAdapterPaths, process.env, option("workspace"));
+      output(result); if (!result.ok) process.exitCode = 1; return;
+    }
+    if (subcommand === "codex") {
+      const result = await doctorCodexAdapter(config, codexAdapterPaths, process.env, option("workspace"));
       output(result); if (!result.ok) process.exitCode = 1; return;
     }
     if (subcommand) throw new Error(`Unknown doctor target: ${subcommand}`);
@@ -126,7 +167,7 @@ async function main(): Promise<void> {
     if (subcommand === "status") {
       output({
         ok: true, operation: "injection_status", config: config.injection,
-        hook: { event: "UserPromptSubmit", ...checkTraeInjectionHook(process.env, process.execPath, join(dirname(fileURLToPath(import.meta.url)), "injection-hook.js")) },
+        hook: { event: injectionAdapter.hookEvent, ...injectionAdapter.check() },
       });
       return;
     }
@@ -146,13 +187,13 @@ async function main(): Promise<void> {
       return;
     }
     if (subcommand === "check-hook") {
-      const result = checkTraeInjectionHook(process.env, process.execPath, join(dirname(fileURLToPath(import.meta.url)), "injection-hook.js"));
+      const result = injectionAdapter.check();
       output({ ok: result.valid && result.installed, operation: "injection_check_hook", ...result });
       if (!result.valid || !result.installed) process.exitCode = 1;
       return;
     }
     if (subcommand === "install-hook") {
-      const result = installTraeInjectionHook(process.env, process.execPath, join(dirname(fileURLToPath(import.meta.url)), "injection-hook.js"));
+      const result = injectionAdapter.install();
       output({ ok: true, operation: "injection_install_hook", ...result });
       return;
     }
@@ -160,10 +201,30 @@ async function main(): Promise<void> {
   }
   if (command === "capture") {
     if (subcommand === "doctor") {
-      const result = captureDoctor(); output(result); if (!result.ok) process.exitCode = 1; return;
+      const source = z.enum(["trae", "codex"]).parse(option("source") || "trae");
+      const result = source === "codex" ? codexCaptureDoctor() : captureDoctor();
+      output(result); if (!result.ok) process.exitCode = 1; return;
     }
     if (subcommand === "status") {
-      output({ ok: true, operation: "capture_status", ...captureStatus(), lock: captureLockStatus(), service: statusCaptureService() });
+      const source = z.enum(["trae", "claude", "codex"]).parse(option("source") || "trae");
+      const status = source === "codex" ? captureCodexStatus(process.env) : captureStatus(process.env, source);
+      output({ ok: true, operation: "capture_status", config: config.capture, ...status,
+        ...(source === "trae" ? { lock: captureLockStatus(), service: statusCaptureService() } : {}) });
+      return;
+    }
+    if (subcommand === "enable") {
+      const workspace = commandArgs[2]; if (!workspace) throw new Error("workspace is required");
+      const normalized = normalizeWorkspacePath(workspace);
+      const workspaces = [...new Set([...config.capture.workspaces.map(normalizeWorkspacePath), normalized])];
+      config.capture = { ...config.capture, enabled: true, workspaces };
+      saveConfig(config);
+      output({ ok: true, operation: "capture_enable", config: config.capture });
+      return;
+    }
+    if (subcommand === "disable") {
+      config.capture = { ...config.capture, enabled: false };
+      saveConfig(config);
+      output({ ok: true, operation: "capture_disable", config: config.capture });
       return;
     }
     if (subcommand === "service") {
@@ -180,9 +241,13 @@ async function main(): Promise<void> {
       throw new Error("Unknown capture service operation: " + (serviceOperation || ""));
     }
     if (subcommand === "sync") {
+      const source = z.enum(["trae", "codex"]).parse(option("source") || "trae");
       const limit = z.coerce.number().int().min(1).max(100).parse(option("limit") || 10);
       const maxThreads = z.coerce.number().int().min(1).max(1000).parse(option("max-threads") || config.capture.maxThreads);
-      output({ ok: true, operation: "capture_sync", ...await syncTraeCapture({ threadId: option("thread"), limit, maxThreads }) }); return;
+      const result = source === "codex"
+        ? await syncCodexCapture({ threadId: option("thread"), limit, maxThreads })
+        : await syncTraeCapture({ threadId: option("thread"), limit, maxThreads });
+      output({ ok: true, operation: "capture_sync", ...result }); return;
     }
     if (subcommand === "watch") {
       const limit = z.coerce.number().int().min(1).max(100).parse(option("limit") || 10);
@@ -202,20 +267,66 @@ async function main(): Promise<void> {
       output(listCaptureCandidates({
         status: status ? z.enum(["pending", "approved", "rejected"]).parse(status) : undefined,
         limit: z.coerce.number().int().min(1).max(500).parse(option("limit") || 50),
-      }));
+      }, process.env, { memoryDatabasePath: config.databasePath, userId: config.userId }));
       return;
     }
     if (subcommand === "thread") {
       const threadId = commandArgs[2]; if (!threadId) throw new Error("thread-id is required");
-      output({ ok: true, operation: "capture_thread", ...inspectCapturedThread(threadId) }); return;
+      const source = z.enum(["trae", "claude", "codex"]).parse(option("source") || "trae");
+      output({ ok: true, operation: "capture_thread", source, ...inspectCapturedThread(threadId, process.env, source) }); return;
     }
     const candidateId = commandArgs[2];
     if (!candidateId) throw new Error("candidate-id is required");
     if (subcommand === "approve") {
-      output({ ok: true, operation: "capture_approve", ...await approveCaptureCandidate(candidateId, config, flag("share") ? "public" : "private") }); return;
+      output({ ok: true, operation: "capture_approve", ...await approveCaptureCandidate(candidateId, config, flag("share") ? "public" : "private", process.env, option("replace-memory")) }); return;
     }
     if (subcommand === "reject") { output({ ok: true, operation: "capture_reject", candidate: rejectCaptureCandidate(candidateId) }); return; }
     throw new Error("Unknown capture command: " + (subcommand || ""));
+  }
+  if (command === "data") {
+    const inbox = new ConversationInbox(captureDatabasePath());
+    try {
+      if (subcommand === "status") {
+        output({
+          ok: true,
+          operation: "data_status",
+          policies: {
+            conversationRetentionDays: config.capture.retentionDays,
+            pendingCandidateRetentionDays: config.capture.pendingCandidateRetentionDays,
+            receiptRetentionDays: config.injection.receiptRetentionDays,
+            maxReceipts: config.injection.maxReceipts,
+          },
+          inbox: { path: captureDatabasePath(), ...inbox.governanceStatus() },
+          receipts: injectionReceiptStatus(),
+          longTermMemory: { path: config.databasePath, preservedByTransientCleanup: true },
+        });
+        return;
+      }
+      if (subcommand === "cleanup") {
+        output({
+          ok: true,
+          operation: "data_cleanup",
+          inbox: inbox.cleanupExpired(config.capture.retentionDays, Date.now(), config.capture.pendingCandidateRetentionDays),
+          receipts: cleanupInjectionReceipts(process.env, config.injection),
+          longTermMemoryPreserved: true,
+        });
+        return;
+      }
+      if (subcommand === "purge-transient") {
+        if (!flag("yes")) throw new Error("Refusing to purge transient Capture and Receipt data without --yes");
+        output({
+          ok: true,
+          operation: "data_purge_transient",
+          inbox: inbox.purgeInbox(),
+          receipts: purgeInjectionReceipts(),
+          longTermMemoryPreserved: true,
+        });
+        return;
+      }
+      throw new Error(`Unknown data command: ${subcommand || ""}`);
+    } finally {
+      inbox.close();
+    }
   }
   if (command === "database") {
     if (subcommand === "check") { output(inspectSqliteDatabase(config.databasePath)); return; }

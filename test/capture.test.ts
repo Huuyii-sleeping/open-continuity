@@ -20,6 +20,7 @@ import {
 } from "../src/capture/capture-service.js";
 import { redactSensitiveText } from "../src/capture/sensitivity.js";
 import type { ConversationItem, ConversationThread } from "../src/capture/types.js";
+import { defaultConfig, saveConfig } from "../src/cli/config.js";
 import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
 import { FAKE_TRAE_THREAD_ID, installFakeTraeCli } from "./helpers/fake-trae.js";
 
@@ -27,18 +28,24 @@ describe("Trae conversation capture", () => {
   const directories: string[] = [];
   afterEach(() => { for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true }); });
 
+  function enableCapture(env: NodeJS.ProcessEnv, workspace: string): void {
+    const config = defaultConfig(env);
+    config.capture = { ...config.capture, enabled: true, workspaces: [workspace] };
+    saveConfig(config, env);
+  }
+
   it("extracts only explicit memory signals and lowers confidence for incomplete turns", () => {
     const item: ConversationItem = { id: "item-1", type: "user_message", text: "我偏好先给结论，再列出验证结果。", rawType: "userMessage" };
-    const complete = extractMemoryCandidates({ threadId: "thread-1", turnId: "turn-1", quality: "complete", item, now: "2030-01-01T00:00:00.000Z" });
+    const complete = extractMemoryCandidates({ source: "trae", threadId: "thread-1", turnId: "turn-1", quality: "complete", item, now: "2030-01-01T00:00:00.000Z" });
     expect(complete).toHaveLength(1);
     expect(complete[0]).toMatchObject({ kind: "user_preference", value: "先给结论，再列出验证结果", rationale: "stated_preference", confidence: 0.92, sensitivity: "private", captureQuality: "complete", status: "pending" });
 
-    const partial = extractMemoryCandidates({ threadId: "thread-1", turnId: "turn-2", quality: "partial", item });
+    const partial = extractMemoryCandidates({ source: "trae", threadId: "thread-1", turnId: "turn-2", quality: "partial", item });
     expect(partial[0]?.confidence).toBe(0.6);
-    expect(extractMemoryCandidates({ threadId: "thread-1", turnId: "turn-decision", quality: "complete", item: { ...item, text: "我们决定以后先运行类型检查，再运行完整测试。" } })).toMatchObject([
+    expect(extractMemoryCandidates({ source: "trae", threadId: "thread-1", turnId: "turn-decision", quality: "complete", item: { ...item, text: "我们决定以后先运行类型检查，再运行完整测试。" } })).toMatchObject([
       expect.objectContaining({ kind: "decision", value: "先运行类型检查，再运行完整测试" }),
     ]);
-    expect(extractMemoryCandidates({ threadId: "thread-1", turnId: "turn-3", quality: "complete", item: { ...item, text: "请解释这个虚构模块。" } })).toEqual([]);
+    expect(extractMemoryCandidates({ source: "trae", threadId: "thread-1", turnId: "turn-3", quality: "complete", item: { ...item, text: "请解释这个虚构模块。" } })).toEqual([]);
   });
 
   it("imports idempotently and writes only approved candidates to long-term memory", async () => {
@@ -147,12 +154,13 @@ describe("Trae conversation capture", () => {
     inbox.close();
   });
 
-  it("retains expired threads with pending candidates and cleans them after review", () => {
+  it("expires raw conversations independently while retaining a fresh review candidate", () => {
     const root = mkdtempSync(join(tmpdir(), "open-continuity-capture-retention-")); directories.push(root);
     const inbox = new ConversationInbox(join(root, "capture.db"));
+    const old = "2000-01-01T00:00:00.000Z";
     const thread: ConversationThread = {
       source: "trae", id: "thread-expired", sessionId: "session-expired", cwd: "/tmp/fictional-workspace", cliVersion: "9.9.9-fictional",
-      preview: "Fictional old thread", ephemeral: false, createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z",
+      preview: "Fictional old thread", ephemeral: false, createdAt: old, updatedAt: old,
       turns: [{ id: "turn-expired", status: "completed", quality: "complete", items: [
         { id: "item-expired", type: "user_message", text: "请记住虚构保留偏好", rawType: "userMessage" },
         { id: "item-expired-final", type: "assistant_message", phase: "final_answer", text: "收到。", rawType: "agentMessage" },
@@ -160,14 +168,15 @@ describe("Trae conversation capture", () => {
     };
     inbox.importThreads([thread]);
     const pending = inbox.listCandidates()[0]!;
-    expect(inbox.cleanupExpired(7, Date.parse("2030-02-01T00:00:00.000Z"))).toMatchObject({ threadsDeleted: 0, itemsDeleted: 0 });
-    expect(inbox.inspectThread(thread.id).thread).not.toBeNull();
-    inbox.rejectCandidate(pending.id);
-    expect(inbox.cleanupExpired(7, Date.parse("2030-02-01T00:00:00.000Z"))).toMatchObject({ threadsDeleted: 1, itemsDeleted: 2, candidatesDeleted: 1 });
+    // Make the candidate fresh relative to this deterministic retention clock.
+    const candidateClock = Date.parse(pending.lastSeenAt);
+    expect(inbox.cleanupExpired(7, candidateClock + 8 * 24 * 60 * 60 * 1000, 30)).toMatchObject({ threadsDeleted: 1, itemsDeleted: 2, candidatesDeleted: 0 });
     expect(inbox.inspectThread(thread.id).thread).toBeNull();
     expect(inbox.readCheckpoint(thread.id)).toMatchObject({ threadUpdatedAt: thread.updatedAt, lastItemCount: 2 });
-    expect(inbox.threadNeedsSync(thread.id, thread.updatedAt)).toBe(false);
-    expect(inbox.listCandidates({ status: "rejected" })).toEqual([]);
+    expect(inbox.threadNeedsSync("trae", thread.id, thread.updatedAt)).toBe(false);
+    expect(inbox.listCandidates()).toEqual([expect.objectContaining({ id: pending.id })]);
+    expect(inbox.cleanupExpired(7, candidateClock + 31 * 24 * 60 * 60 * 1000, 30)).toMatchObject({ threadsDeleted: 0, candidatesDeleted: 1 });
+    expect(inbox.listCandidates()).toEqual([]);
     inbox.close();
   });
 
@@ -190,18 +199,20 @@ describe("Trae conversation capture", () => {
     expect(() => inbox.importThreads([invalid])).toThrow();
     expect(inbox.readCheckpoint(thread.id)).toEqual(before);
     expect(inbox.inspectThread(thread.id).items.map((item) => item.id)).toEqual(["item-checkpoint"]);
-    expect(inbox.threadNeedsSync(thread.id, invalid.updatedAt)).toBe(true);
+    expect(inbox.threadNeedsSync("trae", thread.id, invalid.updatedAt)).toBe(true);
     inbox.close();
   });
 
   it("probes a Trae app-server and synchronizes a non-ephemeral fictional thread", async () => {
     const root = mkdtempSync(join(tmpdir(), "open-continuity-capture-adapter-")); directories.push(root);
     const bin = installFakeTraeCli(root);
-    const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), PATH: bin };
+    const workspace = join(root, "fictional-workspace");
+    const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), PATH: bin, TEST_TRAE_WORKSPACE: workspace };
+    enableCapture(env, workspace);
 
     expect(captureDoctor(env)).toMatchObject({ ok: true, source: "trae", readiness: "ready_for_sync_or_watch", capabilities: { available: true, appServer: true, version: "traecli 9.9.9-fictional" } });
     const sync = await syncTraeCapture({ limit: 10 }, env);
-    expect(sync).toMatchObject({ threadsSeen: 2, threadsImported: 1, turnsImported: 1, itemsImported: 4, candidatesCreated: 1, skippedEphemeral: 1, pagesScanned: 1, threadIds: [FAKE_TRAE_THREAD_ID] });
+    expect(sync).toMatchObject({ threadsSeen: 2, threadsImported: 1, turnsImported: 1, itemsImported: 4, candidatesCreated: 1, skippedEphemeral: 1, skippedNotAllowed: 0, pagesScanned: 1, threadIds: [FAKE_TRAE_THREAD_ID] });
     expect(listCaptureCandidates({}, env).candidates[0]).toMatchObject({ threadId: FAKE_TRAE_THREAD_ID, value: "先给结论，再列出验证结果", captureQuality: "complete", status: "pending" });
     expect(captureStatus(env)).toMatchObject({ sync: { consecutive_failures: 0, last_threads_imported: 1, last_pages_scanned: 1 }, checkpoints: { threads: 1, trackedItems: 4 }, candidates: { pending: 1, approved: 0, rejected: 0 } });
   });
@@ -219,9 +230,26 @@ describe("Trae conversation capture", () => {
   it("follows app-server thread list pages", async () => {
     const root = mkdtempSync(join(tmpdir(), "open-continuity-capture-pages-")); directories.push(root);
     const bin = installFakeTraeCli(root);
-    const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), PATH: bin };
+    const workspace = join(root, "fictional-workspace");
+    const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), PATH: bin, TEST_TRAE_WORKSPACE: workspace };
+    enableCapture(env, workspace);
     const sync = await syncTraeCapture({ limit: 1, maxThreads: 10 }, env);
     expect(sync).toMatchObject({ threadsSeen: 2, pagesScanned: 2, skippedEphemeral: 1, threadsImported: 1 });
+  });
+
+  it("requires Capture opt-in and never persists threads outside the workspace allowlist", async () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-capture-policy-")); directories.push(root);
+    const bin = installFakeTraeCli(root);
+    const threadWorkspace = join(root, "fictional-thread-workspace");
+    const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), PATH: bin, TEST_TRAE_WORKSPACE: threadWorkspace };
+
+    await expect(syncTraeCapture({ limit: 10 }, env)).rejects.toThrow("disabled or has no allowlisted workspace");
+    enableCapture(env, join(root, "different-workspace"));
+    await expect(syncTraeCapture({ threadId: FAKE_TRAE_THREAD_ID }, env)).rejects.toThrow("not allowlisted for Capture");
+    const sync = await syncTraeCapture({ limit: 10 }, env);
+    expect(sync).toMatchObject({ threadsSeen: 2, threadsImported: 0, itemsImported: 0, skippedNotAllowed: 1, threadIds: [] });
+    expect(listCaptureCandidates({}, env).candidates).toEqual([]);
+    expect(captureStatus(env).checkpoints).toMatchObject({ threads: 0, trackedItems: 0 });
   });
 
   it("renders a restartable launchd service with absolute arguments", () => {

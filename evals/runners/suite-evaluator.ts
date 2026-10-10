@@ -73,7 +73,7 @@ function sameCandidate(actual: { kind: MemoryKind; value: string }, expected: Ca
 function evaluateCaptureCase(testCase: CaptureCase, round: number): CaseResult {
   const rawItem: ConversationItem = { id: `${testCase.id}-${round}`, type: testCase.type as ConversationItem["type"], text: testCase.text, rawType: "suiteDataset" };
   const sanitized = sanitizeConversationItem(rawItem);
-  const candidates = extractMemoryCandidates({ threadId: `suite-thread-${round}`, turnId: testCase.id, quality: testCase.quality, item: sanitized.item, now: "2030-01-01T00:00:00.000Z" });
+  const candidates = extractMemoryCandidates({ source: "trae", threadId: `suite-thread-${round}`, turnId: testCase.id, quality: testCase.quality, item: sanitized.item, now: "2030-01-01T00:00:00.000Z" });
   const matches = testCase.expected.every((expected) => candidates.some((candidate) => sameCandidate(candidate, expected))) && candidates.length === testCase.expected.length;
   const confidenceSafe = testCase.expected.every((expected) => expected.maxConfidence === undefined || candidates.filter((candidate) => sameCandidate(candidate, expected)).every((candidate) => candidate.confidence <= expected.maxConfidence!));
   const sensitiveSafe = !testCase.sensitive || (sanitized.matches.length > 0 && candidates.length === 0 && !JSON.stringify(sanitized.item).includes(testCase.text));
@@ -131,15 +131,20 @@ async function evaluateGovernanceCase(testCase: GovernanceCase, round: number): 
       const thread = fictionalThread("idempotent", "2030-01-01T00:01:00.000Z");
       const first = inbox.importThreads([thread]); const second = inbox.importThreads([thread]); inbox.close();
       detail.pass = first.itemsImported === 2 && first.candidatesCreated === 1 && second.itemsImported === 0 && second.candidatesCreated === 0;
-    } else if (testCase.id === "retention-pending-protection") {
+    } else if (testCase.id === "retention-layering") {
       const inbox = new ConversationInbox(join(root, "capture.db"));
-      const thread = fictionalThread("retained", "2030-01-01T00:00:00.000Z");
+      const thread = fictionalThread("retained", new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString());
       inbox.importThreads([thread]);
       const pending = inbox.listCandidates()[0]!;
-      const kept = inbox.cleanupExpired(7, Date.parse("2030-02-01T00:00:00.000Z"));
-      inbox.rejectCandidate(pending.id);
-      const cleaned = inbox.cleanupExpired(7, Date.parse("2030-02-01T00:00:00.000Z")); inbox.close();
-      detail.pass = kept.threadsDeleted === 0 && cleaned.threadsDeleted === 1;
+      const candidateClock = Date.parse(pending.lastSeenAt);
+      const rawExpired = inbox.cleanupExpired(7, candidateClock, 30);
+      const candidateRetained = inbox.listCandidates().some((candidate) => candidate.id === pending.id);
+      const candidateExpired = inbox.cleanupExpired(7, candidateClock + 31 * 24 * 60 * 60 * 1000, 30); inbox.close();
+      detail.pass = rawExpired.threadsDeleted === 1 && rawExpired.itemsDeleted === 2 && rawExpired.candidatesDeleted === 0
+        && candidateRetained && candidateExpired.candidatesDeleted === 1;
+      detail.rawExpired = rawExpired;
+      detail.candidateRetained = candidateRetained;
+      detail.candidateExpired = candidateExpired;
     } else if (testCase.id === "hook-install-idempotency") {
       const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), TRAECLI_HOME: join(root, "trae-cli") };
       const hookPath = join(root, "injection-hook.js"); writeFileSync(hookPath, "// fictional hook");
@@ -152,7 +157,8 @@ async function evaluateGovernanceCase(testCase: GovernanceCase, round: number): 
       const result = installTraeInjectionHook(env, process.execPath, join(root, "injection-hook.js"));
       detail.pass = Boolean(result.backupPath && existsSync(result.backupPath)) && JSON.parse(readFileSync(path, "utf8")).hooks.UserPromptSubmit.length === 2;
     } else if (testCase.id === "watch-incremental-abort") {
-      const bin = installFakeTraeCli(root); const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), PATH: `${bin}${delimiter}${process.env.PATH || ""}` };
+      const bin = installFakeTraeCli(root); const workspace = join(root, "fictional-suite"); const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), TEST_TRAE_WORKSPACE: workspace, PATH: `${bin}${delimiter}${process.env.PATH || ""}` };
+      const config = defaultConfig(env); config.capture = { ...config.capture, enabled: true, workspaces: [workspace] }; saveConfig(config, env);
       const controller = new AbortController(); const cycles: Array<{ imported: number; skipped: number }> = [];
       const result = await watchTraeCapture({ limit: 10, intervalMs: 20, onCycle: (cycle) => { cycles.push({ imported: cycle.threadsImported, skipped: cycle.skippedUnchanged ?? 0 }); if (cycles.length === 2) controller.abort(); } }, env, controller.signal);
       detail.pass = result.cycles === 2 && cycles[0]?.imported === 1 && cycles[1]?.skipped === 1;

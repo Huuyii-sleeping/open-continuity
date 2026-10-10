@@ -81,7 +81,7 @@ function evaluateCapture(dataset: GoldenDataset): GoldenEvaluation["capture"] {
   const results = dataset.capture.map((testCase) => {
     const rawItem: ConversationItem = { id: testCase.id, type: "user_message", text: testCase.text, rawType: "goldenDataset" };
     const sanitized = sanitizeConversationItem(rawItem);
-    const candidates = extractMemoryCandidates({ threadId: "golden-thread", turnId: testCase.id, quality: testCase.quality, item: sanitized.item, now: "2030-01-01T00:00:00.000Z" });
+    const candidates = extractMemoryCandidates({ source: "trae", threadId: "golden-thread", turnId: testCase.id, quality: testCase.quality, item: sanitized.item, now: "2030-01-01T00:00:00.000Z" });
     const predicted = candidates.map((candidate) => ({ kind: candidate.kind, value: candidate.value, confidence: candidate.confidence }));
     const expected = testCase.expected;
     if (expected) expectedPositive += 1;

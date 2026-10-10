@@ -34,11 +34,13 @@ describe("Trae vertical adapter flow", () => {
       ...process.env,
       HOME: join(root, "home"),
       OPEN_CONTINUITY_HOME: join(root, "data"),
+      TEST_TRAE_WORKSPACE: workspace,
       PATH: `${bin}${delimiter}${process.env.PATH || ""}`,
     };
     const cli = join(process.cwd(), "dist/src/cli.js");
 
     execFileSync(process.execPath, [cli, "init", "--json"], { env, encoding: "utf8" });
+    execFileSync(process.execPath, [cli, "capture", "enable", workspace, "--json"], { env, encoding: "utf8" });
     const sync = JSON.parse(execFileSync(process.execPath, [cli, "capture", "sync", "--limit", "10", "--json"], { env, encoding: "utf8" })) as { threadIds: string[]; candidatesCreated: number };
     expect(sync).toMatchObject({ candidatesCreated: 1 });
 

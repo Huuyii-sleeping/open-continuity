@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { CaptureQuality, ConversationItem, MemoryCandidate } from "./types.js";
+import type { CaptureQuality, CaptureSource, ConversationItem, MemoryCandidate } from "./types.js";
 
 interface CandidateSeed { value: string; rationale: string; kind: MemoryCandidate["kind"]; confidence: number; }
 
@@ -30,18 +30,22 @@ function seeds(text: string): CandidateSeed[] {
   return values;
 }
 
-function candidateKey(kind: MemoryCandidate["kind"], value: string): string {
+function candidateFingerprint(kind: MemoryCandidate["kind"], value: string): string {
   const digest = createHash("sha256").update(`${kind}:\0${value}`).digest("hex").slice(0, 16);
-  return `captured:${kind}:${digest}`;
+  return `${kind}:${digest}`;
 }
 
-export function extractMemoryCandidates(input: { threadId: string; turnId: string; quality: CaptureQuality; item: ConversationItem; now?: string }): MemoryCandidate[] {
+export function extractMemoryCandidates(input: { source: CaptureSource; threadId: string; turnId: string; quality: CaptureQuality; item: ConversationItem; now?: string }): MemoryCandidate[] {
   if (input.item.type !== "user_message" || !input.item.text || input.item.sensitive) return [];
   const createdAt = input.now ?? new Date().toISOString();
-  return seeds(input.item.text).map((seed) => ({
-    id: randomUUID(), source: "trae", threadId: input.threadId, turnId: input.turnId, itemId: input.item.id,
-    kind: seed.kind, key: candidateKey(seed.kind, seed.value), value: seed.value, evidence: input.item.text!,
+  return seeds(input.item.text).map((seed) => {
+    const fingerprint = candidateFingerprint(seed.kind, seed.value);
+    return {
+    id: randomUUID(), source: input.source, threadId: input.threadId, turnId: input.turnId, itemId: input.item.id,
+    kind: seed.kind, key: `captured:${fingerprint}`, value: seed.value, evidence: input.item.text!,
     rationale: seed.rationale, confidence: input.quality === "complete" ? seed.confidence : Math.min(seed.confidence, 0.6),
+    dedupeKey: fingerprint, occurrenceCount: 1, lastSeenAt: createdAt,
     sensitivity: "private", captureQuality: input.quality, status: "pending", createdAt,
-  }));
+  } satisfies MemoryCandidate;
+  });
 }

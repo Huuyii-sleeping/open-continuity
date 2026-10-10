@@ -4,6 +4,8 @@
   "description": "A local-first, user-controlled shared memory and handoff layer with Agent capture and injection adapters.",
   "keywords": [
     "agent",
+    "shared-memory",
+    "local-first",
     "conversation-continuity",
     "agent-adapter",
     "memory-injection",
@@ -63,6 +65,7 @@
     "eval:suite": "tsx evals/runners/suite.ts",
     "eval:quality": "tsx evals/runners/quality.ts",
     "test": "vitest run",
+    "test:soak": "OPEN_CONTINUITY_SOAK_CYCLES=1000 vitest run test/capture-resilience.test.ts",
     "test:watch": "vitest",
     "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit"

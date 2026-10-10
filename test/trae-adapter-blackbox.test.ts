@@ -23,14 +23,14 @@ describe("Trae adapter process black box", () => {
     const workspace = join(root, "fictional-workspace");
     const env = {
       ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), TRAECLI_HOME: join(root, "trae-cli"),
-      TEST_STATE_DIR: join(root, "state"), PATH: `${bin}${delimiter}${process.env.PATH || ""}`,
+      TEST_STATE_DIR: join(root, "state"), TEST_TRAE_WORKSPACE: workspace, PATH: `${bin}${delimiter}${process.env.PATH || ""}`,
     };
     const cli = join(process.cwd(), "dist/src/cli.js");
     const server = join(process.cwd(), "dist/src/server.js");
     const hook = join(process.cwd(), "dist/src/injection-hook.js");
 
     const setup = JSON.parse(execFileSync(process.execPath, [cli, "setup", "trae", "--workspace", workspace, "--json"], { env, encoding: "utf8" }));
-    expect(setup).toMatchObject({ ok: true, doctor: { ok: true } });
+    expect(setup).toMatchObject({ ok: true, steps: { capture: { enabled: true, workspaces: [workspace] } }, doctor: { ok: true } });
     const hooksDocument = JSON.parse(readFileSync(join(root, "trae-cli/hooks.json"), "utf8"));
     expect(JSON.stringify(hooksDocument)).toContain(hook);
 

@@ -1,6 +1,6 @@
 {
   "version": "suite-v1",
-  "description": "Fictional multi-round assessment suite for Trae Capture, Inbox governance, and Injection safety.",
+  "description": "Fictional multi-round assessment suite for Adapter Capture, layered Inbox governance, and Injection safety.",
   "rounds": 5,
   "thresholds": {
     "captureCasePassRate": 1,
@@ -46,7 +46,7 @@
   ],
   "governance": [
     {"id": "inbox-idempotency"},
-    {"id": "retention-pending-protection"},
+    {"id": "retention-layering"},
     {"id": "hook-install-idempotency"},
     {"id": "hook-existing-config-backup"},
     {"id": "watch-incremental-abort"},
