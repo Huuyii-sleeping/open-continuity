@@ -8,6 +8,17 @@ import type { ConversationThread } from "../src/capture/types.js";
 import { MemoryService } from "../src/core/memory-service.js";
 import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
 
+function parseJsonLine(output: string): unknown {
+  const lines = output.trim().split(/\r?\n/u);
+  let line: string | undefined;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const candidate = lines[index]!.trim();
+    if (candidate.startsWith("{") && candidate.endsWith("}")) { line = candidate; break; }
+  }
+  if (!line) throw new Error(`Expected JSON output, received: ${output}`);
+  return JSON.parse(line);
+}
+
 describe("data governance CLI", () => {
   const directories: string[] = [];
   afterEach(() => { for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true }); });
@@ -72,7 +83,7 @@ describe("data governance CLI", () => {
 
     const refused = spawnSync(process.execPath, [cli, "data", "purge-transient", "--json"], { env, encoding: "utf8" });
     expect(refused.status).toBe(1);
-    expect(JSON.parse(refused.stderr)).toMatchObject({ error: { message: expect.stringContaining("without --yes") } });
+    expect(parseJsonLine(refused.stderr)).toMatchObject({ error: { message: expect.stringContaining("without --yes") } });
 
     const purged = JSON.parse(execFileSync(process.execPath, [cli, "data", "purge-transient", "--yes", "--json"], { env, encoding: "utf8" }));
     expect(purged).toMatchObject({
