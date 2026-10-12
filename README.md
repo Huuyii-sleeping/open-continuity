@@ -81,7 +81,7 @@ RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenCon
 | 能力 | 当前证据 |
 | --- | --- |
 | Trae Adapter 闭环 | 真实 app-server 只读探针、虚构进程级 Capture→审核→Hook→MCP 黑盒，以及纵向 E2E |
-| Claude Code Adapter 闭环 | 官方 Hook/transcript 契约、虚构进程级 setup→Stop Capture→审核→UserPromptSubmit Injection→MCP 深搜黑盒；真实客户端 smoke 待安装环境验证 |
+| Claude Code Adapter 闭环 | 官方 Hook/transcript 契约、虚构进程级完整黑盒；真实 Claude Code 2.1.296 已验证隔离 setup、MCP 连接和 UserPromptSubmit Hook 触发，模型支持的 Stop/Injection 内容闭环仍待有效供应商凭据 |
 | Codex Adapter 闭环 | 本机 `codex-cli 0.162.1` app-server 只读探针、虚构进程级黑盒、真实持久化 `codex exec` smoke，以及真实 `/hooks → Trust all → prompt` 交互 smoke 均通过；自动化注入断言使用单次 bypass，新 Codex 进程仍可能需要重新检查 `/hooks` |
 | 跨 Agent 共享记忆与 Handoff | `open-continuity demo` 启动两个真实 MCP stdio 客户端进行隔离验证 |
 | Lite 本地运行 | SQLite、FTS5、事务、审计历史、备份与恢复 |
@@ -112,11 +112,11 @@ Codex CLI 使用对应的一键入口：
 
 `connect` 会拒绝把临时 `npx` 缓存路径写入永久客户端配置；全局安装或项目内持久安装都可以。
 
-`setup trae` 是 Trae 的推荐接入入口：它会在需要时完成本地初始化，核验 Trae app-server，连接 OpenContinuity MCP，把指定 workspace 同时加入 Capture 与 Injection allowlist，备份并安装 `UserPromptSubmit` Hook，再在 macOS 安装和启动用户级 Capture 服务。命令可重复执行；只有配置或安装路径变化时才会刷新 MCP/重载服务。非 macOS 环境会保留前台 `capture watch` 接入方式。随后运行 `doctor trae`，可以逐层检查 Capture、checkpoint、Hook、MCP 和本地数据库。Trae 不提供可脚本化的 Hook 信任状态，也不应被设置为全局免审批，因此仍需在 Trae `/hooks` 中确认 Hook，并在需要深度查询时按正常策略批准 OpenContinuity MCP 只读工具。
+`setup trae` 是 Trae 的推荐接入入口：它会在需要时完成本地初始化，核验 Trae app-server，连接 OpenContinuity MCP，把指定 workspace 同时加入 Trae 自己的 Capture 与 Injection allowlist，备份并安装 `UserPromptSubmit` Hook，再在 macOS 安装和启动用户级 Capture 服务。命令可重复执行；只有配置或安装路径变化时才会刷新 MCP/重载服务。Setup 按 plan → apply → verify 执行；后续步骤失败时会补偿回滚本轮 MCP、Hook、配置和服务变更。非 macOS 环境会保留前台 `capture watch` 接入方式。随后运行 `doctor trae`，可以逐层检查 Capture、checkpoint、Hook、MCP 和本地数据库。Trae 不提供可脚本化的 Hook 信任状态，也不应被设置为全局免审批，因此仍需在 Trae `/hooks` 中确认 Hook，并在需要深度查询时按正常策略批准 OpenContinuity MCP 只读工具。
 
-`setup claude` 使用 Claude Code 官方用户级 Hooks：`Stop` Hook 在一轮完成后读取该会话的 transcript，`UserPromptSubmit` Hook 在下一轮注入少量已批准共享记忆；两者都受同一 workspace allowlist 约束。安装器保留已有 `settings.json` 内容并在修改前备份。设置后需要重启正在运行的 Claude Code 会话，再用 `doctor claude` 检查 Hook、Capture 水位、MCP 和数据库。OpenContinuity 不会关闭 Claude Code 自己的 MCP 审批。
+`setup claude` 使用 Claude Code 官方用户级 Hooks：`Stop` Hook 在一轮完成后读取该会话的 transcript，`UserPromptSubmit` Hook 在下一轮注入少量已批准共享记忆；两者受 Claude Adapter 自己的 workspace allowlist 约束，不会继承 Trae 或 Codex 的授权。安装器保留已有 `settings.json` 内容并在修改前备份；若 MCP 之后的 Hook 或验证步骤失败，会恢复本轮开始前的状态。设置后需要重启正在运行的 Claude Code 会话，再用 `doctor claude` 检查 Hook、Capture 水位、MCP 和数据库。OpenContinuity 不会关闭 Claude Code 自己的 MCP 审批。
 
-`setup codex` 使用 Codex 本地 `app-server --stdio` 读取已保存线程，并在 `$CODEX_HOME/hooks.json`（通常为 `~/.codex/hooks.json`）安装官方 `Stop` 与 `UserPromptSubmit` command hooks。`Stop` 只把当前 session 的可观测回合增量同步到 Inbox；`UserPromptSubmit` 只注入已批准的 public 记忆。安装器会备份已有 hooks 配置并可幂等重跑。设置后需要重启正在运行的 Codex 会话，并在 Codex `/hooks` 页面检查、信任两个 Hook。真实持久化 `codex exec` smoke 和真实交互式 `/hooks → Trust all → prompt` smoke 均已验证；自动化注入断言使用单次 `--dangerously-bypass-hook-trust`，新进程是否复用信任仍取决于 Codex 生命周期。若本机 Codex 不提供 `app-server`，请继续使用 `connect codex` 的 MCP-only 模式。
+`setup codex` 使用 Codex 本地 `app-server --stdio` 读取已保存线程，并在 `$CODEX_HOME/hooks.json`（通常为 `~/.codex/hooks.json`）安装官方 `Stop` 与 `UserPromptSubmit` command hooks。`Stop` 只把当前 session 的可观测回合增量同步到 Inbox；`UserPromptSubmit` 只注入已批准的 public 记忆。安装器会备份已有 hooks 配置、记录自己拥有的处理器、自动收敛旧安装路径并可幂等重跑；安全卸载不会删除用户自己的 Hook。设置后需要重启正在运行的 Codex 会话，并在 Codex `/hooks` 页面检查、信任两个 Hook。真实持久化 `codex exec` smoke 和真实交互式 `/hooks → Trust all → prompt` smoke 均已验证；自动化注入断言使用单次 `--dangerously-bypass-hook-trust`，新进程是否复用信任仍取决于 Codex 生命周期。若本机 Codex 不提供 `app-server`，请继续使用 `connect codex` 的 MCP-only 模式。
 
 `demo` 是不修改真实配置的产品证明：它会启动两个使用不同 Agent 身份的真实 MCP stdio 进程，让 Agent A 向临时 SQLite 写入记忆并创建 Handoff Capsule，关闭 Agent A 后再由 Agent B 读取记忆和恢复交接，最后自动删除临时数据库。它不要求提前执行 `init`，也不会访问 `~/.open-continuity/memories.db`。
 
@@ -171,11 +171,11 @@ Codex CLI 使用对应的一键入口：
 
 Trae 每轮轻量记忆注入（实验性）：
 
-    open-continuity injection enable "$PWD"
+    open-continuity injection enable "$PWD" --agent trae
     open-continuity injection status --json
     open-continuity injection disable
 
-如需拆开排障或手动管理，也可以使用上面的 Capture/Injection 子命令。`injection enable` 只会把当前 workspace 加入 OpenContinuity 自己的 allowlist；推荐由 `setup trae` 负责完整接入。启用后，在 Trae 用户级 `$TRAECLI_HOME/hooks.json`（没有设置时通常是 `$HOME/.trae/hooks.json`）增加下面的 `UserPromptSubmit` command hook；把命令中的路径替换成 `injection status --json` 返回的绝对路径：
+如需拆开排障或手动管理，也可以使用上面的 Capture/Injection 子命令。`injection enable <workspace> --agent <name>` 与 `capture enable <workspace> --source <name>` 只修改指定 Agent 的 allowlist；v1 配置首次读取时会自动迁移到 v2，并保留 `config.json.v1.backup`。`injection uninstall-hook --agent <name>` 只删除 OpenContinuity 记录为自己拥有的 Hook（Claude/Codex 的 Stop Hook 也会一并移除并禁用对应 Capture），不会删除其它用户处理器。推荐由 `setup trae` 负责完整接入。启用后，在 Trae 用户级 `$TRAECLI_HOME/hooks.json`（没有设置时通常是 `$HOME/.trae/hooks.json`）增加下面的 `UserPromptSubmit` command hook；把命令中的路径替换成 `injection status --json` 返回的绝对路径：
 
     {
       "hooks": {
@@ -249,7 +249,7 @@ HTTP 服务默认监听 http://127.0.0.1:8787。MCP Server 使用 stdio transpor
 
 Claude Adapter 不读取私有内部接口，而是使用 Claude Code 公开的 `UserPromptSubmit` 与 `Stop` Hook 契约。`Stop` 输入提供 `transcript_path` 和最终回复，Adapter 将 JSONL 中可观测的 user、assistant、tool 与 compaction 记录规范化后写入同一个本地 Inbox；由于 transcript 可能异步落盘，最终回复会用 Hook 的 `last_assistant_message` 补齐。OpenContinuity 自己注入的 memory context 与 meta/system reminder 会被过滤，避免形成记忆反馈循环。会话运行中切换到 allowlist 外目录的记录也会逐条跳过。
 
-Claude Capture 由每轮 `Stop` 事件触发，不需要常驻轮询服务；Injection 则在下一轮 `UserPromptSubmit` 发生时执行。Hook 失败时保持 fail open，不阻塞 Claude。当前已通过完全虚构的进程级黑盒测试和安装后 tarball smoke；由于本机没有真实 Claude Code，可用性声明仍限于公开协议兼容，真实客户端 smoke 是 Beta 发布前的环境依赖检查。
+Claude Capture 由每轮 `Stop` 事件触发，不需要常驻轮询服务；Injection 则在下一轮 `UserPromptSubmit` 发生时执行。Hook 失败时保持 fail open，不阻塞 Claude。当前已通过完全虚构的进程级黑盒测试和安装后 tarball smoke；真实 Claude Code 2.1.296 还在隔离配置、虚构 workspace 和不可达本地 API 端点下验证了 setup、MCP 连接、UserPromptSubmit Hook 调用及隐私安全回执。该探针不产生模型回复，因此不能替代模型支持的 Stop Capture 和非空 Injection 闭环，后者仍需有效的 Anthropic、Bedrock、Vertex 或 Foundry 凭据。
 
 ## Codex CLI Conversation Adapter（实验性）
 

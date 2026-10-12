@@ -1,8 +1,10 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { normalizeClaudeTranscript } from "../src/capture/claude-transcript.js";
+import { syncCaptureAdapter } from "../src/capture/capture-adapter-service.js";
+import { ClaudeTranscriptCaptureAdapter, normalizeClaudeTranscript } from "../src/capture/claude-transcript.js";
+import { ConversationInbox } from "../src/capture/conversation-inbox.js";
 import { checkClaudeHooks, ClaudeInjectionAdapter, installClaudeHooks } from "../src/injection/claude-hook-config.js";
 
 describe("Claude Code Adapter protocol", () => {
@@ -88,6 +90,95 @@ describe("Claude Code Adapter protocol", () => {
     const assistantItems = thread.turns[0].items.filter((item) => item.type === "assistant_message");
     expect(assistantItems).toHaveLength(2);
     expect(assistantItems.filter((item) => item.phase === "final_answer")).toHaveLength(1);
+  });
+
+  it("streams a stable transcript and rejects a persistently incomplete JSONL file", async () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-claude-transcript-")); directories.push(root);
+    const transcriptPath = join(root, "fictional-transcript.jsonl");
+    const input = {
+      session_id: "fictional-session",
+      prompt_id: "fictional-prompt",
+      transcript_path: transcriptPath,
+      cwd: "/tmp/fictional-claude-workspace",
+      hook_event_name: "Stop" as const,
+    };
+    writeFileSync(transcriptPath, JSON.stringify({
+      type: "user", uuid: "fictional-user", cwd: input.cwd, timestamp: "2030-01-01T00:00:00.000Z",
+      message: { role: "user", content: "虚构问题" },
+    }) + "\n");
+    const adapter = new ClaudeTranscriptCaptureAdapter(input, "2030-01-01T00:00:01.000Z", [input.cwd]);
+    await adapter.connect();
+    const thread = await adapter.readThread(input.session_id);
+    expect(thread.turns).toHaveLength(1);
+    expect(thread.turns[0]?.items[0]).toMatchObject({ type: "user_message", text: "虚构问题" });
+    await adapter.close();
+
+    writeFileSync(transcriptPath, "{incomplete-json");
+    const unstable = new ClaudeTranscriptCaptureAdapter(input, "2030-01-01T00:00:01.000Z", [input.cwd], { maxReadAttempts: 1 });
+    await unstable.connect();
+    await expect(unstable.readThread(input.session_id)).rejects.toThrow("transcript remained unstable");
+    await unstable.close();
+  });
+
+  it("resumes from a durable byte cursor and safely falls back after truncation", async () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-claude-incremental-")); directories.push(root);
+    const transcriptPath = join(root, "fictional-transcript.jsonl");
+    const workspace = join(root, "fictional-workspace");
+    const input = {
+      session_id: "fictional-incremental-session",
+      prompt_id: "fictional-incremental-prompt",
+      transcript_path: transcriptPath,
+      cwd: workspace,
+      hook_event_name: "Stop" as const,
+    };
+    const line = (value: Record<string, unknown>) => JSON.stringify({ cwd: workspace, ...value }) + "\n";
+    writeFileSync(transcriptPath, line({ type: "user", uuid: "incremental-user-one", timestamp: "2030-01-01T00:00:00.000Z", message: { role: "user", content: "第一轮虚构问题" } })
+      + line({ type: "assistant", uuid: "incremental-assistant-one", timestamp: "2030-01-01T00:00:01.000Z", message: { role: "assistant", content: [{ type: "text", text: "第一轮虚构回答" }] } }));
+    const inbox = new ConversationInbox(join(root, "capture.db"));
+    try {
+      const first = new ClaudeTranscriptCaptureAdapter(input, "2030-01-01T00:00:02.000Z", [workspace]);
+      await expect(syncCaptureAdapter(first, inbox, { threadId: input.session_id, workspaces: [workspace] })).resolves.toMatchObject({ itemsImported: 2 });
+      const firstCheckpoint = inbox.readCheckpoint(input.session_id, "claude");
+      expect(firstCheckpoint?.cursor).toEqual(expect.any(String));
+      const firstCaptured = inbox.inspectThread(input.session_id, "claude");
+      expect(firstCaptured.items).toHaveLength(2);
+      expect(firstCaptured.thread?.preview).toBe("第一轮虚构问题");
+
+      const unchanged = new ClaudeTranscriptCaptureAdapter(input, "2030-01-01T00:00:03.000Z", [workspace]);
+      await expect(syncCaptureAdapter(unchanged, inbox, { threadId: input.session_id, workspaces: [workspace] })).resolves.toMatchObject({ itemsImported: 0, turnsImported: 0 });
+      expect(inbox.inspectThread(input.session_id, "claude").items).toHaveLength(2);
+
+      appendFileSync(transcriptPath, line({ type: "user", uuid: "incremental-user-appended", timestamp: "2030-01-01T00:00:03.500Z", message: { role: "user", content: "追加的虚构问题" } })
+        + line({ type: "assistant", uuid: "incremental-assistant-appended", timestamp: "2030-01-01T00:00:03.600Z", message: { role: "assistant", content: [{ type: "text", text: "追加的虚构回答" }] } }));
+      const appended = new ClaudeTranscriptCaptureAdapter(input, "2030-01-01T00:00:03.700Z", [workspace]);
+      await appended.connect();
+      const delta = await appended.readThread(input.session_id, { checkpoint: firstCheckpoint! });
+      expect(delta).toMatchObject({
+        captureDelta: true,
+        captureBaseCursor: firstCheckpoint?.cursor,
+        turns: [expect.objectContaining({ id: "incremental-user-appended" })],
+      });
+      expect(delta.turns).toHaveLength(1);
+      await appended.close();
+
+      const appendedSync = new ClaudeTranscriptCaptureAdapter(input, "2030-01-01T00:00:03.700Z", [workspace]);
+      await expect(syncCaptureAdapter(appendedSync, inbox, { threadId: input.session_id, workspaces: [workspace] })).resolves.toMatchObject({ itemsImported: 2, turnsImported: 1 });
+      expect(inbox.inspectThread(input.session_id, "claude").items).toHaveLength(4);
+
+      writeFileSync(transcriptPath, line({ type: "user", uuid: "incremental-user-two", timestamp: "2030-01-01T00:00:04.000Z", message: { role: "user", content: "第二轮虚构问题" } })
+        + line({ type: "assistant", uuid: "incremental-assistant-two", timestamp: "2030-01-01T00:00:05.000Z", message: { role: "assistant", content: [{ type: "text", text: "第二轮虚构回答" }] } }));
+      const afterTruncation = new ClaudeTranscriptCaptureAdapter(input, "2030-01-01T00:00:06.000Z", [workspace]);
+      await expect(syncCaptureAdapter(afterTruncation, inbox, { threadId: input.session_id, workspaces: [workspace] })).resolves.toMatchObject({ itemsImported: 2, turnsImported: 1 });
+      const captured = inbox.inspectThread(input.session_id, "claude");
+      expect(captured.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({ text: "第二轮虚构问题" }),
+        expect.objectContaining({ text: "第二轮虚构回答" }),
+      ]));
+      expect(captured.thread?.preview).toBe("第二轮虚构问题");
+      expect(inbox.readCheckpoint(input.session_id, "claude")?.cursor).not.toBe(firstCheckpoint?.cursor);
+    } finally {
+      inbox.close();
+    }
   });
 
   it("implements the Injection Adapter contract with a Claude identity", () => {

@@ -1,13 +1,14 @@
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { agentNameSchema, ensureConfig, normalizeWorkspacePath, requireConfig, saveConfig } from "./cli/config.js";
+import { adapterCaptureConfig, adapterInjectionConfig, agentNameSchema, ensureConfig, normalizeWorkspacePath, requireConfig, saveConfig } from "./cli/config.js";
 import { connectAgent, detectAgents, disconnectAgent } from "./cli/connectors.js";
 import { runDemo } from "./cli/demo.js";
 import { runDoctor } from "./cli/doctor.js";
 import { doctorClaudeAdapter, setupClaudeAdapter, type ClaudeAdapterPaths } from "./cli/claude-adapter.js";
 import { doctorCodexAdapter, setupCodexAdapter, type CodexAdapterPaths } from "./cli/codex-adapter.js";
 import { doctorTraeAdapter, setupTraeAdapter, type TraeAdapterPaths } from "./cli/trae-adapter.js";
+import { createInjectionAdapter } from "./adapters/registry.js";
 import {
   approveCaptureCandidate,
   captureDoctor,
@@ -23,8 +24,6 @@ import { captureServicePaths, installCaptureService, startCaptureService, status
 import { watchTraeCapture } from "./capture/trae-watch.js";
 import { ConversationInbox } from "./capture/conversation-inbox.js";
 import { captureDatabasePath } from "./capture/paths.js";
-import { TraeInjectionAdapter } from "./injection/trae-hook-config.js";
-import { CodexInjectionAdapter } from "./injection/codex-hook-config.js";
 import { cleanupInjectionReceipts, injectionReceiptStatus, purgeInjectionReceipts } from "./injection/receipt-store.js";
 import { exportMemoryPackage, importMemoryPackage } from "./package/memory-package.js";
 import { SqliteMemoryStore } from "./sqlite/sqlite-memory-store.js";
@@ -58,15 +57,16 @@ Usage:
   open-continuity disconnect <trae|claude|codex>
   open-continuity setup <trae|claude|codex> [--workspace <path>] [--force]
   open-continuity doctor [trae|claude|codex] [--workspace <path>]
-  open-continuity injection status
-  open-continuity injection enable <workspace>
-  open-continuity injection disable
-  open-continuity injection check-hook
-  open-continuity injection install-hook
+  open-continuity injection status [--agent trae|claude|codex]
+  open-continuity injection enable <workspace> [--agent trae|claude|codex]
+  open-continuity injection disable [--agent trae|claude|codex]
+  open-continuity injection check-hook [--agent trae|claude|codex]
+  open-continuity injection install-hook [--agent trae|claude|codex]
+  open-continuity injection uninstall-hook [--agent trae|claude|codex]
   open-continuity capture doctor [--source trae|codex]
   open-continuity capture status [--source trae|claude|codex]
-  open-continuity capture enable <workspace>
-  open-continuity capture disable
+  open-continuity capture enable <workspace> [--source trae|claude|codex]
+  open-continuity capture disable [--source trae|claude|codex]
   open-continuity capture service <install|start|stop|status|uninstall>
   open-continuity capture sync [--source trae|codex] [--thread <thread-id>] [--limit n]
   open-continuity capture candidates [--status pending|approved|rejected] [--limit n]
@@ -122,10 +122,12 @@ async function main(): Promise<void> {
     injectionHookPath: join(runtimeDirectory, "codex-injection-hook.js"),
     captureHookPath: join(runtimeDirectory, "codex-capture-hook.js"),
   };
-  const requestedInjectionAgent = option("agent") || option("source") || "trae";
-  const injectionAdapter = requestedInjectionAgent === "codex"
-    ? new CodexInjectionAdapter(process.env, process.execPath, codexAdapterPaths)
-    : new TraeInjectionAdapter(process.env, process.execPath, traeAdapterPaths.injectionHookPath);
+  const requestedInjectionAgent = agentNameSchema.parse(option("agent") || option("source") || "trae");
+  const injectionAdapter = createInjectionAdapter(requestedInjectionAgent, process.env, process.execPath, {
+    trae: { injectionHookPath: traeAdapterPaths.injectionHookPath },
+    claude: claudeAdapterPaths,
+    codex: codexAdapterPaths,
+  });
   const config = command === "setup" ? ensureConfig().config : requireConfig();
   if (command === "setup") {
     const workspace = option("workspace") || process.cwd();
@@ -164,9 +166,10 @@ async function main(): Promise<void> {
     const result = await runDoctor(config, serverPath); output(result); if (!result.ok) process.exitCode = 1; return;
   }
   if (command === "injection") {
+    const injectionConfig = () => adapterInjectionConfig(config, requestedInjectionAgent);
     if (subcommand === "status") {
       output({
-        ok: true, operation: "injection_status", config: config.injection,
+        ok: true, operation: "injection_status", agent: requestedInjectionAgent, config: injectionConfig(),
         hook: { event: injectionAdapter.hookEvent, ...injectionAdapter.check() },
       });
       return;
@@ -174,16 +177,17 @@ async function main(): Promise<void> {
     if (subcommand === "enable") {
       const workspace = commandArgs[2]; if (!workspace) throw new Error("workspace is required");
       const normalized = normalizeWorkspacePath(workspace);
-      const workspaces = [...new Set([...config.injection.workspaces.map(normalizeWorkspacePath), normalized])];
-      config.injection = { ...config.injection, enabled: true, workspaces };
+      const state = config.adapters[requestedInjectionAgent].injection;
+      const workspaces = [...new Set([...state.workspaces.map(normalizeWorkspacePath), normalized])];
+      config.adapters[requestedInjectionAgent].injection = { enabled: true, workspaces };
       saveConfig(config);
-      output({ ok: true, operation: "injection_enable", config: config.injection });
+      output({ ok: true, operation: "injection_enable", agent: requestedInjectionAgent, config: injectionConfig() });
       return;
     }
     if (subcommand === "disable") {
-      config.injection = { ...config.injection, enabled: false };
+      config.adapters[requestedInjectionAgent].injection.enabled = false;
       saveConfig(config);
-      output({ ok: true, operation: "injection_disable", config: config.injection });
+      output({ ok: true, operation: "injection_disable", agent: requestedInjectionAgent, config: injectionConfig() });
       return;
     }
     if (subcommand === "check-hook") {
@@ -197,6 +201,21 @@ async function main(): Promise<void> {
       output({ ok: true, operation: "injection_install_hook", ...result });
       return;
     }
+    if (subcommand === "uninstall-hook") {
+      const result = injectionAdapter.uninstall();
+      config.adapters[requestedInjectionAgent].injection.enabled = false;
+      if (requestedInjectionAgent !== "trae") config.adapters[requestedInjectionAgent].capture.enabled = false;
+      saveConfig(config);
+      output({
+        ok: result.valid && !result.installed,
+        operation: "injection_uninstall_hook",
+        agent: requestedInjectionAgent,
+        disabled: requestedInjectionAgent === "trae" ? ["injection"] : ["injection", "capture"],
+        ...result,
+      });
+      if (!result.valid || result.installed) process.exitCode = 1;
+      return;
+    }
     throw new Error(`Unknown injection command: ${subcommand || ""}`);
   }
   if (command === "capture") {
@@ -208,23 +227,26 @@ async function main(): Promise<void> {
     if (subcommand === "status") {
       const source = z.enum(["trae", "claude", "codex"]).parse(option("source") || "trae");
       const status = source === "codex" ? captureCodexStatus(process.env) : captureStatus(process.env, source);
-      output({ ok: true, operation: "capture_status", config: config.capture, ...status,
+      output({ ok: true, operation: "capture_status", config: adapterCaptureConfig(config, source), ...status,
         ...(source === "trae" ? { lock: captureLockStatus(), service: statusCaptureService() } : {}) });
       return;
     }
     if (subcommand === "enable") {
       const workspace = commandArgs[2]; if (!workspace) throw new Error("workspace is required");
+      const source = agentNameSchema.parse(option("source") || "trae");
       const normalized = normalizeWorkspacePath(workspace);
-      const workspaces = [...new Set([...config.capture.workspaces.map(normalizeWorkspacePath), normalized])];
-      config.capture = { ...config.capture, enabled: true, workspaces };
+      const state = config.adapters[source].capture;
+      const workspaces = [...new Set([...state.workspaces.map(normalizeWorkspacePath), normalized])];
+      config.adapters[source].capture = { enabled: true, workspaces };
       saveConfig(config);
-      output({ ok: true, operation: "capture_enable", config: config.capture });
+      output({ ok: true, operation: "capture_enable", source, config: adapterCaptureConfig(config, source) });
       return;
     }
     if (subcommand === "disable") {
-      config.capture = { ...config.capture, enabled: false };
+      const source = agentNameSchema.parse(option("source") || "trae");
+      config.adapters[source].capture.enabled = false;
       saveConfig(config);
-      output({ ok: true, operation: "capture_disable", config: config.capture });
+      output({ ok: true, operation: "capture_disable", source, config: adapterCaptureConfig(config, source) });
       return;
     }
     if (subcommand === "service") {

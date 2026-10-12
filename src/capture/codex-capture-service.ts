@@ -1,4 +1,4 @@
-import { isWorkspaceAllowed, loadConfig } from "../cli/config.js";
+import { adapterCaptureConfig, isWorkspaceAllowed, loadConfig } from "../cli/config.js";
 import { syncCaptureAdapter } from "./capture-adapter-service.js";
 import { ConversationInbox } from "./conversation-inbox.js";
 import { captureDatabasePath } from "./paths.js";
@@ -26,10 +26,11 @@ export async function runCodexCaptureHook(
 ): Promise<CodexCaptureHookResult> {
   const input = parseCodexStopInput(rawInput);
   const config = loadConfig(env);
-  if (!config?.capture.enabled || config.capture.workspaces.length === 0) {
+  const capture = config ? adapterCaptureConfig(config, "codex") : null;
+  if (!capture?.enabled || capture.workspaces.length === 0) {
     return { outcome: "disabled", detail: "capture_disabled_or_no_allowlisted_workspace" };
   }
-  if (!isWorkspaceAllowed(config.capture.workspaces, input.cwd)) {
+  if (!isWorkspaceAllowed(capture.workspaces, input.cwd)) {
     return { outcome: "disabled", detail: "workspace_not_allowed" };
   }
   const capabilities = probeCodexCapture(env);
@@ -41,8 +42,8 @@ export async function runCodexCaptureHook(
     const adapter = new CodexAppServerCaptureAdapter(binary, env);
     const result = await syncCaptureAdapter(adapter, inbox, {
       threadId: input.session_id,
-      workspaces: config.capture.workspaces,
-      ...(config.capture.autoCleanup ? { retentionDays: config.capture.retentionDays, pendingCandidateRetentionDays: config.capture.pendingCandidateRetentionDays } : {}),
+      workspaces: capture.workspaces,
+      ...(capture.autoCleanup ? { retentionDays: capture.retentionDays, pendingCandidateRetentionDays: capture.pendingCandidateRetentionDays } : {}),
     });
     return {
       outcome: "captured", source: "codex", threadId: input.session_id,
@@ -78,7 +79,8 @@ export async function syncCodexCapture(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<CaptureSyncResult & { inboxPath: string; threadIds: string[] }> {
   const config = loadConfig(env);
-  if (!config?.capture.enabled || config.capture.workspaces.length === 0) {
+  const capture = config ? adapterCaptureConfig(config, "codex") : null;
+  if (!capture?.enabled || capture.workspaces.length === 0) {
     throw new Error("Conversation Capture is disabled or has no allowlisted workspace. Run `open-continuity capture enable <workspace>` first.");
   }
   const capabilities = probeCodexCapture(env);
@@ -90,8 +92,8 @@ export async function syncCodexCapture(
     const adapter = new CodexAppServerCaptureAdapter(capabilities.binary, env);
     const imported = await syncCaptureAdapter(adapter, inbox, {
       threadId: input.threadId, limit: input.limit, maxThreads: input.maxThreads,
-      workspaces: config.capture.workspaces,
-      ...(config.capture.autoCleanup ? { retentionDays: config.capture.retentionDays, pendingCandidateRetentionDays: config.capture.pendingCandidateRetentionDays } : {}),
+      workspaces: capture.workspaces,
+      ...(capture.autoCleanup ? { retentionDays: capture.retentionDays, pendingCandidateRetentionDays: capture.pendingCandidateRetentionDays } : {}),
     });
     return { ...imported, inboxPath };
   } finally { inbox.close(); }

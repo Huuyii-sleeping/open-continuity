@@ -125,7 +125,8 @@ async function evaluateInjection(dataset: GoldenDataset): Promise<GoldenEvaluati
     const outsideWorkspace = join(root, "outside-workspace");
     const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data") };
     const config = defaultConfig(env);
-    config.injection = { ...config.injection, enabled: true, workspaces: [workspace], maxMemories: 8 };
+    config.injection = { ...config.injection, maxMemories: 8 };
+    config.adapters.trae.injection = { enabled: true, workspaces: [workspace] };
     saveConfig(config, env);
     const labelsToIds = new Map<string, string>();
     const service = new MemoryService(new SqliteMemoryStore(config.databasePath));

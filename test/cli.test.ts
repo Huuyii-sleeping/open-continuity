@@ -120,8 +120,35 @@ describe("CLI", () => {
     const installedAgain = JSON.parse(execFileSync(process.execPath, [cli, "injection", "install-hook", "--json"], { env: { ...env, TRAECLI_HOME: join(root, "trae-cli") }, encoding: "utf8" }));
     expect(installedAgain).toMatchObject({ ok: true, changed: false, installed: true });
 
+    const uninstalled = JSON.parse(execFileSync(process.execPath, [cli, "injection", "uninstall-hook", "--json"], { env: { ...env, TRAECLI_HOME: join(root, "trae-cli") }, encoding: "utf8" }));
+    expect(uninstalled).toMatchObject({ ok: true, operation: "injection_uninstall_hook", agent: "trae", changed: true, installed: false, disabled: ["injection"] });
+
     const disabled = JSON.parse(execFileSync(process.execPath, [cli, "injection", "disable", "--json"], { env, encoding: "utf8" }));
     expect(disabled).toMatchObject({ ok: true, operation: "injection_disable", config: { enabled: false, workspaces: [workspace] } });
+  }, 15_000);
+
+  it("routes Claude Injection management to the Claude hook format", () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-cli-claude-injection-")); directories.push(root);
+    const home = join(root, "home");
+    const env = { ...process.env, HOME: home, OPEN_CONTINUITY_HOME: join(root, "data"), PATH: process.env.PATH };
+    const cli = join(process.cwd(), "dist/src/cli.js");
+    execFileSync(process.execPath, [cli, "init", "--json"], { env, encoding: "utf8" });
+
+    const workspace = join(root, "fictional-workspace");
+    const enabled = JSON.parse(execFileSync(process.execPath, [cli, "injection", "enable", workspace, "--agent", "claude", "--json"], { env, encoding: "utf8" }));
+    expect(enabled).toMatchObject({ agent: "claude", config: { enabled: true, workspaces: [workspace] } });
+    const traeStatus = JSON.parse(execFileSync(process.execPath, [cli, "injection", "status", "--agent", "trae", "--json"], { env, encoding: "utf8" }));
+    expect(traeStatus).toMatchObject({ agent: "trae", config: { enabled: false, workspaces: [] } });
+
+    const installed = JSON.parse(execFileSync(process.execPath, [cli, "injection", "install-hook", "--agent", "claude", "--json"], { env, encoding: "utf8" }));
+    expect(installed).toMatchObject({ ok: true, operation: "injection_install_hook", changed: true, installed: true });
+    const settings = JSON.parse(readFileSync(join(home, ".claude", "settings.json"), "utf8"));
+    expect(settings.hooks.UserPromptSubmit[0].hooks[0]).toMatchObject({
+      type: "command",
+      command: process.execPath,
+      args: [expect.stringContaining("claude-injection-hook.js")],
+    });
+    expect(JSON.stringify(settings)).not.toContain("trae");
   }, 15_000);
 
   it("sets up and diagnoses the complete Trae adapter idempotently", () => {
@@ -138,6 +165,7 @@ describe("CLI", () => {
     expect(first).toMatchObject({
       ok: true, operation: "setup_trae", workspace,
       steps: { mcp: { changed: true }, injection: { enabled: true, hookChanged: true }, capture: { enabled: true, workspaces: [workspace] }, captureService: { installed: true, status: "running", alreadyRunning: false } },
+      transaction: { phase: "complete", rollback: [] },
       doctor: { adapter: "trae", ok: true },
     });
     expect(first.doctor.checks).toEqual(expect.arrayContaining([

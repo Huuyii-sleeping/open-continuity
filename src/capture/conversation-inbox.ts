@@ -32,6 +32,7 @@ function parseCheckpoint(row: Row): CaptureCheckpoint {
     lastItemId: row.last_item_id == null ? undefined : String(row.last_item_id),
     lastItemCount: Number(row.last_item_count),
     syncedAt: String(row.synced_at),
+    ...(row.cursor == null ? {} : { cursor: String(row.cursor) }),
   };
 }
 
@@ -58,10 +59,13 @@ export class ConversationInbox {
       for (const thread of threads) {
         if (thread.ephemeral) { result.skippedEphemeral += 1; continue; }
         const syncedAt = new Date().toISOString();
-        const preview = redactSensitiveText(thread.preview).text;
-        const existing = this.get("SELECT updated_at FROM capture_threads WHERE source = ? AND thread_id = ?", [thread.source, thread.id]);
+        const existing = this.get("SELECT * FROM capture_threads WHERE source = ? AND thread_id = ?", [thread.source, thread.id]);
+        const preserveMetadata = thread.captureDelta === true;
+        const preview = preserveMetadata && existing?.preview != null ? String(existing.preview) : redactSensitiveText(thread.preview).text;
+        const createdAt = preserveMetadata && existing?.created_at != null ? String(existing.created_at) : thread.createdAt;
+        const cliVersion = preserveMetadata && thread.cliVersion === "unknown" && existing?.cli_version != null ? String(existing.cli_version) : thread.cliVersion;
         this.run("INSERT INTO capture_threads (source, thread_id, session_id, cwd, cli_version, preview, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (source, thread_id) DO UPDATE SET session_id = excluded.session_id, cwd = excluded.cwd, cli_version = excluded.cli_version, preview = excluded.preview, created_at = excluded.created_at, updated_at = excluded.updated_at, synced_at = excluded.synced_at",
-          [thread.source, thread.id, thread.sessionId, thread.cwd, thread.cliVersion, preview, thread.createdAt, thread.updatedAt, syncedAt]);
+          [thread.source, thread.id, thread.sessionId, thread.cwd, cliVersion, preview, createdAt, thread.updatedAt, syncedAt]);
         if (!existing || existing.updated_at !== thread.updatedAt) result.threadsImported += 1;
         for (const turn of thread.turns) {
           const turnExisting = this.get("SELECT 1 FROM capture_turns WHERE source = ? AND thread_id = ? AND turn_id = ?", [thread.source, thread.id, turn.id]);
@@ -84,8 +88,13 @@ export class ConversationInbox {
         const lastTurn = thread.turns.at(-1);
         const allItems = thread.turns.flatMap((turn) => turn.items);
         const lastItem = allItems.at(-1);
-        this.run("INSERT INTO capture_checkpoints (source, thread_id, thread_updated_at, last_turn_id, last_item_id, last_item_count, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (source, thread_id) DO UPDATE SET thread_updated_at = excluded.thread_updated_at, last_turn_id = excluded.last_turn_id, last_item_id = excluded.last_item_id, last_item_count = excluded.last_item_count, synced_at = excluded.synced_at",
-          [thread.source, thread.id, thread.updatedAt, lastTurn?.id ?? null, lastItem?.id ?? null, allItems.length, syncedAt]);
+        const existingCheckpoint = this.get("SELECT * FROM capture_checkpoints WHERE source = ? AND thread_id = ?", [thread.source, thread.id]);
+        const totalItemCount = Number(this.get("SELECT COUNT(*) AS count FROM capture_items WHERE source = ? AND thread_id = ?", [thread.source, thread.id])?.count ?? allItems.length);
+        const checkpointLastTurnId = existingCheckpoint?.last_turn_id == null ? null : String(existingCheckpoint.last_turn_id);
+        const checkpointLastItemId = existingCheckpoint?.last_item_id == null ? null : String(existingCheckpoint.last_item_id);
+        const checkpointCursor = existingCheckpoint?.cursor == null ? null : String(existingCheckpoint.cursor);
+        this.run("INSERT INTO capture_checkpoints (source, thread_id, thread_updated_at, last_turn_id, last_item_id, last_item_count, synced_at, cursor) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (source, thread_id) DO UPDATE SET thread_updated_at = excluded.thread_updated_at, last_turn_id = excluded.last_turn_id, last_item_id = excluded.last_item_id, last_item_count = excluded.last_item_count, synced_at = excluded.synced_at, cursor = excluded.cursor",
+          [thread.source, thread.id, thread.updatedAt, lastTurn?.id ?? checkpointLastTurnId, lastItem?.id ?? checkpointLastItemId, totalItemCount, syncedAt, thread.captureCursor ?? checkpointCursor]);
       }
       this.database.exec("COMMIT");
       return result;
@@ -342,7 +351,7 @@ export class ConversationInbox {
     const statements = [
       "CREATE TABLE IF NOT EXISTS capture_sync_state (source TEXT PRIMARY KEY, last_success_at TEXT, last_error_at TEXT, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_threads_seen INTEGER NOT NULL DEFAULT 0, last_threads_imported INTEGER NOT NULL DEFAULT 0, last_items_imported INTEGER NOT NULL DEFAULT 0, last_candidates_created INTEGER NOT NULL DEFAULT 0, last_pages_scanned INTEGER NOT NULL DEFAULT 0, last_warning TEXT)",
       "CREATE TABLE IF NOT EXISTS capture_threads (source TEXT NOT NULL, thread_id TEXT NOT NULL, session_id TEXT NOT NULL, cwd TEXT NOT NULL, cli_version TEXT NOT NULL, preview TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, synced_at TEXT NOT NULL, PRIMARY KEY (source, thread_id))",
-      "CREATE TABLE IF NOT EXISTS capture_checkpoints (source TEXT NOT NULL, thread_id TEXT NOT NULL, thread_updated_at TEXT NOT NULL, last_turn_id TEXT, last_item_id TEXT, last_item_count INTEGER NOT NULL DEFAULT 0, synced_at TEXT NOT NULL, PRIMARY KEY (source, thread_id))",
+      "CREATE TABLE IF NOT EXISTS capture_checkpoints (source TEXT NOT NULL, thread_id TEXT NOT NULL, thread_updated_at TEXT NOT NULL, last_turn_id TEXT, last_item_id TEXT, last_item_count INTEGER NOT NULL DEFAULT 0, synced_at TEXT NOT NULL, cursor TEXT, PRIMARY KEY (source, thread_id))",
       "CREATE TABLE IF NOT EXISTS capture_turns (source TEXT NOT NULL, thread_id TEXT NOT NULL, turn_id TEXT NOT NULL, status TEXT NOT NULL, capture_quality TEXT NOT NULL, started_at TEXT, completed_at TEXT, PRIMARY KEY (source, thread_id, turn_id))",
       "CREATE TABLE IF NOT EXISTS capture_items (source TEXT NOT NULL, thread_id TEXT NOT NULL, turn_id TEXT NOT NULL, item_id TEXT NOT NULL, ordinal INTEGER NOT NULL, item_type TEXT NOT NULL, phase TEXT, raw_type TEXT NOT NULL, content TEXT NOT NULL, PRIMARY KEY (source, thread_id, turn_id, item_id))",
       "CREATE TABLE IF NOT EXISTS memory_candidates (id TEXT PRIMARY KEY, source TEXT NOT NULL, thread_id TEXT NOT NULL, turn_id TEXT NOT NULL, item_id TEXT NOT NULL, kind TEXT NOT NULL, memory_key TEXT NOT NULL, dedupe_key TEXT NOT NULL, value TEXT NOT NULL, evidence TEXT NOT NULL, rationale TEXT NOT NULL, confidence REAL NOT NULL, occurrence_count INTEGER NOT NULL DEFAULT 1, last_seen_at TEXT NOT NULL, sensitivity TEXT NOT NULL, capture_quality TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, reviewed_at TEXT, memory_event_id TEXT, UNIQUE (source, thread_id, turn_id, item_id, memory_key))",
@@ -358,6 +367,8 @@ export class ConversationInbox {
       ? new Set(this.all("PRAGMA table_info(memory_candidates)", []).map((row) => String(row.name)))
       : new Set<string>();
     for (const statement of statements.slice(0, 5)) this.database.exec(statement);
+    const checkpointColumns = new Set(this.all("PRAGMA table_info(capture_checkpoints)", []).map((row) => String(row.name)));
+    if (!checkpointColumns.has("cursor")) this.database.exec("ALTER TABLE capture_checkpoints ADD COLUMN cursor TEXT");
     if (candidateTableExists) {
       if (!existingColumns.has("dedupe_key")) this.database.exec("ALTER TABLE memory_candidates ADD COLUMN dedupe_key TEXT");
       if (!existingColumns.has("occurrence_count")) this.database.exec("ALTER TABLE memory_candidates ADD COLUMN occurrence_count INTEGER NOT NULL DEFAULT 1");

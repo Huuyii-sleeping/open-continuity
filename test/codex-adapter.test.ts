@@ -50,6 +50,60 @@ describe("Codex Adapter protocol", () => {
     await adapter.close();
   });
 
+  it("hydrates every turn across paginated turn pages", async () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-codex-paging-")); directories.push(root);
+    const bin = installFakeCodexCli(root);
+    const workspace = join(root, "fictional-workspace"); mkdirSync(workspace, { recursive: true });
+    const env = {
+      ...process.env,
+      FICTIONAL_CODEX_WORKSPACE: workspace,
+      FICTIONAL_CODEX_PAGINATE_TURNS: "1",
+      CODEX_HOME: join(root, "codex-home"),
+      PATH: `${bin}${delimiter}${process.env.PATH || ""}`,
+    };
+    const adapter = new CodexAppServerCaptureAdapter(join(bin, "codex"), env, { turnPageSize: 1 });
+    await adapter.connect();
+    const thread = await adapter.readThread("fictional-codex-session");
+    expect(thread.turns).toHaveLength(2);
+    expect(thread.turns.map((turn) => turn.id)).toEqual(["fictional-codex-turn", "fictional-codex-turn-2"]);
+    await adapter.close();
+  });
+
+  it("rejects a repeated Codex thread-list cursor", async () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-codex-repeated-page-")); directories.push(root);
+    const bin = installFakeCodexCli(root);
+    const workspace = join(root, "fictional-workspace"); mkdirSync(workspace, { recursive: true });
+    const env = {
+      ...process.env,
+      FICTIONAL_CODEX_WORKSPACE: workspace,
+      FICTIONAL_CODEX_REPEAT_THREAD_CURSOR: "1",
+      CODEX_HOME: join(root, "codex-home"),
+      PATH: `${bin}${delimiter}${process.env.PATH || ""}`,
+    };
+    const adapter = new CodexAppServerCaptureAdapter(join(bin, "codex"), env);
+    await adapter.connect();
+    await expect(adapter.listThreads({ pageSize: 1, maxThreads: 10 })).rejects.toThrow("repeated thread cursor");
+    await adapter.close();
+  });
+
+  it("does not silently fall back to an incomplete history after a later page fails", async () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-codex-page-failure-")); directories.push(root);
+    const bin = installFakeCodexCli(root);
+    const workspace = join(root, "fictional-workspace"); mkdirSync(workspace, { recursive: true });
+    const env = {
+      ...process.env,
+      FICTIONAL_CODEX_WORKSPACE: workspace,
+      FICTIONAL_CODEX_PAGINATE_TURNS: "1",
+      FICTIONAL_CODEX_FAIL_SECOND_TURN_PAGE: "1",
+      CODEX_HOME: join(root, "codex-home"),
+      PATH: `${bin}${delimiter}${process.env.PATH || ""}`,
+    };
+    const adapter = new CodexAppServerCaptureAdapter(join(bin, "codex"), env, { turnPageSize: 1 });
+    await adapter.connect();
+    await expect(adapter.readThread("fictional-codex-session")).rejects.toThrow("fictional second page failure");
+    await adapter.close();
+  });
+
   it("preserves user settings and installs Codex hooks idempotently", () => {
     const root = mkdtempSync(join(tmpdir(), "open-continuity-codex-hooks-")); directories.push(root);
     const home = join(root, "home"); const codexHome = join(home, ".codex"); mkdirSync(codexHome, { recursive: true });

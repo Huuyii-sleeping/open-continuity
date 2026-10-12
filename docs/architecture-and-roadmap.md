@@ -316,7 +316,7 @@ memory-package/
 
 - 已完成 Trae Capture/Injection 的稳定性、安装诊断、真实只读探针和进程黑盒；Codex 也已完成 app-server 只读探针与独立进程黑盒，具体客户端版本变化仍需持续兼容验证。
 - 已明确 Capture、短期 Inbox、候选审核、长期共享记忆、轻量 Injection 和 MCP 深搜的边界，并补齐保留/清理策略。
-- 已抽象通用 Adapter 契约并实现 Claude Code、Codex 两个独立 Adapter；真实 Codex 持久化 `codex exec` smoke 与交互式 `/hooks → Trust all → prompt` smoke 已通过，真实 Claude Code 客户端 smoke 仍待对应环境验证；新 Codex 进程是否复用信任仍由客户端生命周期决定。
+- 已抽象通用 Adapter 契约并实现 Claude Code、Codex 两个独立 Adapter；真实 Claude Code 2.1.296 已通过隔离 setup、MCP 连接和 UserPromptSubmit Hook 探针，但模型支持的 Stop/非空 Injection 闭环仍待有效供应商凭据；真实 Codex 持久化 `codex exec` smoke 与交互式 `/hooks → Trust all → prompt` smoke 已通过，新 Codex 进程是否复用信任仍由客户端生命周期决定。
 - 已实现确定性候选去重、保守冲突门禁和显式版本演化；基于模型的语义归并仍是后续可选能力。
 - 下一步是在不改变本地优先和用户批准边界的前提下，收集真实 Beta 兼容数据，再决定各客户端兼容性维护与关系模型的优先级。
 
@@ -336,9 +336,11 @@ memory-package/
 - `setup trae` 已聚合 MCP、Hook、workspace allowlist 与 macOS launchd Capture；`doctor trae` 分层报告运行状态和必须人工确认的 Hook 信任/MCP 审批边界。
 - `setup claude` 已聚合 MCP、双 Hook 与 workspace allowlist；Stop transcript Capture 不依赖常驻服务，并处理异步最终回复、workspace 切换和自注入反馈。
 - `setup codex` 已聚合 MCP、app-server Capture、双 Hook 与 workspace allowlist；`thread/turns/list` 优先、旧版 `thread/read` 回退，reasoning 只保留类型标记；Hook 配置写入前备份且可幂等重跑。
+- Adapter 配置已升级为 per-agent Capture/Injection 状态；v1 自动保守迁移并备份。Hook 安装维护本地所有权清单，可收敛旧运行路径并安全卸载；三种 `setup` 均采用 plan/apply/verify + reverse compensation，失败不会留下半安装状态。
+- 当前三种 Adapter 已进入功能冻结和维护阶段：只有真实客户端兼容回归、安全/隔离/数据正确性缺陷、新 Agent 接入，或可量化的可靠性问题才重新开启 Adapter 功能开发；其余研发资源转向 Core。
 - 候选 exact 重复会合并 occurrence；确定性高相似内容必须经用户指定目标后才能演化为新版本，不会静默覆盖。
 - 原始回合、pending 候选和 Receipt 采用分层 TTL/数量限制，可查询、立即清理或显式清空瞬时层；长期共享记忆不受瞬时 purge 影响。
-- 尚缺模型语义提取、条件化偏好自动归并和真实 Claude 客户端 smoke。Codex 已有真实持久化与交互式 smoke，自动化注入断言使用单次 `--dangerously-bypass-hook-trust`，新进程仍可能需要用户在 `/hooks` 中信任 Hook。Trae 在非 macOS 平台当前仍需以前台 `watch` 或用户自己的进程管理器运行。
+- 尚缺模型语义提取、条件化偏好自动归并，以及由真实模型支持的 Claude Stop Capture/非空 Injection smoke。Codex 已有真实持久化与交互式 smoke，自动化注入断言使用单次 `--dangerously-bypass-hook-trust`，新进程仍可能需要用户在 `/hooks` 中信任 Hook。Trae 在非 macOS 平台当前仍需以前台 `watch` 或用户自己的进程管理器运行。
 
 当前版本号表达的是共享记忆底座与首批三种 Adapter 的 Developer Preview 成熟度，不代表每个部署都必须启用全部组件。Lite 在 V1.1 仍保持单机、低成本和可离线运行。
 

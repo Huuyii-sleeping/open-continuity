@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { MemoryService } from "../core/memory-service.js";
+import { estimateContextTokens } from "../core/context-pack.js";
 import { SqliteMemoryStore } from "../sqlite/sqlite-memory-store.js";
-import { loadConfig, normalizeWorkspacePath, isWorkspaceAllowed, type LocalConfig } from "../cli/config.js";
+import { adapterInjectionConfig, agentNameSchema, loadConfig, normalizeWorkspacePath, isWorkspaceAllowed, type InjectionConfig, type LocalConfig } from "../cli/config.js";
 import type { ContextPackInput, ContextPackResult } from "../shared/types.js";
 import type { InjectionHookInput, InjectionHookOutput, InjectionReceipt, InjectionOutcome } from "./types.js";
 import type { InjectionAdapter } from "../adapters/contracts.js";
@@ -39,9 +40,9 @@ function recordReceipt(env: NodeJS.ProcessEnv, config: LocalConfig, receipt: Inj
   appendInjectionReceipt(env, receipt, config.injection);
 }
 
-function workspaceAllowed(config: LocalConfig, cwd?: string): boolean {
-  if (!config.injection.enabled || !cwd) return false;
-  return isWorkspaceAllowed(config.injection.workspaces, cwd);
+function workspaceAllowed(config: InjectionConfig, cwd?: string): boolean {
+  if (!config.enabled || !cwd) return false;
+  return isWorkspaceAllowed(config.workspaces, cwd);
 }
 
 function makeReceipt(input: { agentId: string; hook: InjectionHookInput; outcome: InjectionOutcome; startedAt: number; memoryIds?: string[]; reasons?: string[]; tokenEstimate?: number; detail?: string }): InjectionReceipt {
@@ -55,6 +56,16 @@ function makeReceipt(input: { agentId: string; hook: InjectionHookInput; outcome
   };
 }
 
+function renderedContextText(output: InjectionHookOutput): string {
+  return output.hookSpecificOutput?.additionalContext ?? "";
+}
+
+function contextBudgetForHook(adapter: InjectionAdapter<InjectionHookOutput>, totalBudget: number): number {
+  const probe = renderedContextText(adapter.renderContext("x"));
+  const wrapperTokens = Math.max(0, estimateContextTokens(probe) - estimateContextTokens("x"));
+  return totalBudget - wrapperTokens;
+}
+
 export async function runInjectionHook(input: InjectionHookInput, env: NodeJS.ProcessEnv = process.env, runtime: InjectionRuntime = {}): Promise<InjectionHookOutput> {
   const startedAt = Date.now();
   const adapter = runtime.adapter ?? new TraeInjectionAdapter(env);
@@ -62,7 +73,9 @@ export async function runInjectionHook(input: InjectionHookInput, env: NodeJS.Pr
   let config: LocalConfig | null = null;
   try {
     config = loadConfig(env);
-    if (!config || !workspaceAllowed(config, input.cwd)) {
+    const agent = agentNameSchema.parse(agentId);
+    const injection = config ? adapterInjectionConfig(config, agent) : null;
+    if (!config || !injection || !workspaceAllowed(injection, input.cwd)) {
       if (config) recordReceipt(env, config, makeReceipt({ agentId, hook: input, outcome: "disabled", startedAt, detail: "injection_disabled_or_workspace_not_allowed" }));
       return adapter.emptyOutput();
     }
@@ -70,17 +83,28 @@ export async function runInjectionHook(input: InjectionHookInput, env: NodeJS.Pr
       recordReceipt(env, config, makeReceipt({ agentId, hook: input, outcome: "skipped", startedAt, detail: "missing_prompt" }));
       return adapter.emptyOutput();
     }
-    const service = runtime.createService?.(config) ?? new MemoryService(new SqliteMemoryStore(config.databasePath), {}, { defaultTokenBudget: config.injection.tokenBudget, maxTokenBudget: config.injection.tokenBudget, maxMemories: config.injection.maxMemories, requireUserConfirmed: true });
+    const service = runtime.createService?.(config) ?? new MemoryService(new SqliteMemoryStore(config.databasePath), {}, { defaultTokenBudget: injection.tokenBudget, maxTokenBudget: injection.tokenBudget, maxMemories: injection.maxMemories, requireUserConfirmed: true });
     try {
+      const contextBudget = contextBudgetForHook(adapter, injection.tokenBudget);
+      if (contextBudget < 64) {
+        recordReceipt(env, config, makeReceipt({ agentId, hook: input, outcome: "skipped", startedAt, reasons: ["render_budget"], detail: "injection_budget_too_small" }));
+        return adapter.emptyOutput();
+      }
       let timeoutHandle: NodeJS.Timeout | undefined;
       try {
         const pack = await Promise.race([
-          service.context({ userId: config.userId, agentId, query: injectionQuery(input.prompt), includePrivate: false, purpose: "general", tokenBudget: config.injection.tokenBudget, maxMemories: config.injection.maxMemories }),
-          new Promise<never>((_, reject) => { timeoutHandle = setTimeout(() => reject(new Error("injection timeout")), config!.injection.timeoutMs); }),
+          service.context({ userId: config.userId, agentId, query: injectionQuery(input.prompt), includePrivate: false, purpose: "general", tokenBudget: contextBudget, maxMemories: injection.maxMemories }),
+          new Promise<never>((_, reject) => { timeoutHandle = setTimeout(() => reject(new Error("injection timeout")), injection.timeoutMs); }),
         ]);
         const outcome = pack.items.length ? "injected" : "skipped";
-        recordReceipt(env, config, makeReceipt({ agentId, hook: input, outcome, startedAt, memoryIds: pack.items.map((item) => item.memoryId), reasons: [...new Set(pack.items.flatMap((item) => item.reasons))], tokenEstimate: pack.budget.usedTokens, detail: pack.items.length ? undefined : "no_relevant_public_memory" }));
-        return adapter.renderContext(pack.context);
+        const rendered = adapter.renderContext(pack.context);
+        const renderedTokens = estimateContextTokens(renderedContextText(rendered));
+        if (renderedTokens > injection.tokenBudget) {
+          recordReceipt(env, config, makeReceipt({ agentId, hook: input, outcome: "skipped", startedAt, reasons: ["render_budget"], detail: "injection_render_budget_exceeded" }));
+          return adapter.emptyOutput();
+        }
+        recordReceipt(env, config, makeReceipt({ agentId, hook: input, outcome, startedAt, memoryIds: pack.items.map((item) => item.memoryId), reasons: [...new Set(pack.items.flatMap((item) => item.reasons))], tokenEstimate: renderedTokens, detail: pack.items.length ? undefined : "no_relevant_public_memory" }));
+        return rendered;
       } finally {
         if (timeoutHandle) clearTimeout(timeoutHandle);
       }

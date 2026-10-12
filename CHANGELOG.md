@@ -21,11 +21,21 @@ All notable changes to OpenContinuity are documented here. The project follows S
 - Local transient-data governance with turn-level 7-day Conversation Inbox retention, 30-day pending-candidate retention, bounded 30-day/5000-entry Injection receipts, owner-only local file permissions, and status/cleanup/purge CLI commands.
 - Adapter contract, failure recovery, 1000-cycle soak, Claude process black-box, candidate evolution, migration, and data-governance tests using fictional data only.
 - Installed-tarball smoke coverage for shared-memory handoff, Claude Adapter setup/doctor, and transient-data policy.
+- Unified Capture checkpoint read options, runtime snapshot identity validation, and Claude transcript byte-cursor resume with safe file-rotation fallback.
+- Shared Injection context envelope with final rendered-payload budgeting and budget-exhaustion fail-open behavior across Trae, Claude Code, and Codex.
+- Shared Injection Adapter registry for CLI routing, exact delta base-cursor validation, bounded/repeated-cursor pagination guards, short-transcript byte-resume correctness, and escaped untrusted-memory envelope content.
+- Claude Code 2.1.x MCP setup compatibility by placing the positional server name before its variadic environment options.
+- Real Claude Code 2.1.296 no-account probe coverage for isolated setup, MCP connection, UserPromptSubmit Hook execution, and privacy-safe receipt recording; credential-backed Stop Capture remains explicitly unverified.
 
 ### Changed
 
 - The product narrative now clarifies that shared memory and handoff remain the core product, while Capture Adapter → user-approved Inbox promotion → Injection Adapter → on-demand MCP deep query is the first complete productization path; Trae, Claude Code, and Codex CLI are the first Adapter implementations.
 - Capture cleanup now applies to individual turns and filters expired turns before re-import, so an actively updated long-running conversation cannot keep old raw content indefinitely.
+- Injection token budgets now include the adapter safety envelope, so configured limits apply to the final Hook context rather than only the inner memory lines.
+- Local configuration v2 separates Capture and Injection enablement/workspace allowlists per Agent. Existing v1 configuration is migrated conservatively with an on-disk backup instead of granting one Agent's workspaces to every Adapter.
+- Hook lifecycle management now records owned handlers, reconciles stale installed-runtime paths, and supports safe `injection uninstall-hook --agent <name>` without deleting unrelated user hooks.
+- `setup trae|claude|codex` now reports a plan/apply/verify transaction and compensates MCP, Hook, configuration, and Trae service mutations when a later step fails.
+- The three-Adapter milestone is now explicitly feature-frozen for the current beta; future Adapter work is limited to evidence-backed compatibility, security, correctness, or new-client requirements while primary feature development moves to Core.
 
 ### Security
 

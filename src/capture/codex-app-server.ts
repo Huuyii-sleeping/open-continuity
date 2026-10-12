@@ -1,7 +1,7 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { findExecutable } from "../cli/connectors.js";
-import type { CaptureAdapter, CaptureListResult, CaptureThreadReference } from "../adapters/contracts.js";
+import type { CaptureAdapter, CaptureListResult, CaptureReadOptions, CaptureThreadReference } from "../adapters/contracts.js";
 import type { ConversationItem, ConversationThread, ConversationTurn } from "./types.js";
 
 type RecordValue = Record<string, unknown>;
@@ -30,6 +30,8 @@ export interface CodexCaptureCapabilities {
 
 export interface CodexAppServerClientOptions {
   requestTimeoutMs?: number;
+  turnPageSize?: number;
+  maxTurnPages?: number;
 }
 
 function record(value: unknown): RecordValue | undefined {
@@ -193,6 +195,8 @@ export class CodexAppServerCaptureAdapter implements CaptureAdapter {
   private nextId = 1;
   private readonly pending = new Map<number, PendingRequest>();
   private readonly requestTimeoutMs: number;
+  private readonly turnPageSize: number;
+  private readonly maxTurnPages: number;
 
   constructor(
     private readonly binary: string,
@@ -200,6 +204,8 @@ export class CodexAppServerCaptureAdapter implements CaptureAdapter {
     options: CodexAppServerClientOptions = {},
   ) {
     this.requestTimeoutMs = options.requestTimeoutMs ?? 15_000;
+    this.turnPageSize = options.turnPageSize ?? 1000;
+    this.maxTurnPages = Math.max(1, Math.floor(options.maxTurnPages ?? 10_000));
   }
 
   async connect(): Promise<void> {
@@ -220,7 +226,9 @@ export class CodexAppServerCaptureAdapter implements CaptureAdapter {
     const threads: RecordValue[] = [];
     let cursor: string | undefined;
     let pages = 0;
+    const seenCursors = new Set<string>();
     do {
+      if (pages >= Math.max(1, maxThreads)) throw new Error("Codex app-server thread pagination exceeded its page bound");
       const page = pageData(await this.request("thread/list", {
         limit: Math.min(pageSize, Math.max(1, maxThreads - threads.length)),
         ...(cursor ? { cursor } : {}), sortKey: "updated_at", sortDirection: "desc", archived: false,
@@ -230,6 +238,8 @@ export class CodexAppServerCaptureAdapter implements CaptureAdapter {
         const thread = record(value);
         if (thread) threads.push(thread);
       }
+      if (page.nextCursor && seenCursors.has(page.nextCursor)) throw new Error("Codex app-server returned a repeated thread cursor");
+      if (page.nextCursor) seenCursors.add(page.nextCursor);
       cursor = page.nextCursor;
     } while (cursor && threads.length < maxThreads);
     const references: CaptureThreadReference[] = threads.slice(0, maxThreads).flatMap((thread) => {
@@ -239,14 +249,35 @@ export class CodexAppServerCaptureAdapter implements CaptureAdapter {
     return { threads: references, pages, truncated: Boolean(cursor) };
   }
 
-  async readThread(threadId: string): Promise<ConversationThread> {
+  async readThread(threadId: string, _options?: CaptureReadOptions): Promise<ConversationThread> {
     const result = record(await this.request("thread/read", { threadId, includeTurns: false }));
     const thread = result?.thread;
     let turns: unknown[] = [];
+    let pagesRead = 0;
     try {
-      const page = pageData(await this.request("thread/turns/list", { threadId, limit: 1000, sortDirection: "asc", itemsView: "full" }));
-      turns = page.data;
-    } catch {
+      let cursor: string | undefined;
+      const seenCursors = new Set<string>();
+      do {
+        if (pagesRead >= this.maxTurnPages) throw new Error("Codex app-server turn pagination exceeded its page bound");
+        const page = pageData(await this.request("thread/turns/list", {
+          threadId,
+          limit: this.turnPageSize,
+          ...(cursor ? { cursor } : {}),
+          sortDirection: "asc",
+          itemsView: "full",
+        }));
+        pagesRead += 1;
+        turns.push(...page.data);
+        if (page.nextCursor && seenCursors.has(page.nextCursor)) throw new Error("Codex app-server returned a repeated turns cursor");
+        if (page.nextCursor) seenCursors.add(page.nextCursor);
+        cursor = page.nextCursor;
+      } while (cursor);
+    } catch (error) {
+      // Once a page has been received, falling back to a legacy read could
+      // silently replace a partial result with an incomplete history. Only
+      // use the legacy endpoint when the paginated endpoint is unavailable
+      // before it returns its first page.
+      if (pagesRead > 0) throw error;
       // Older app-server builds only expose full-history hydration.
       const legacy = record(await this.request("thread/read", { threadId, includeTurns: true }));
       const legacyThread = record(legacy?.thread);

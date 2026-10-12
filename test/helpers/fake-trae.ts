@@ -65,7 +65,9 @@ input.on("line", (line) => {
   if (request.method === "initialize") result = { serverInfo: { name: "fake-trae", version: "1" } };
   else if (request.method === "thread/list") {
     const cursor = request.params?.cursor;
-    result = request.params?.limit === 1
+    result = process.env.TEST_TRAE_REPEAT_THREAD_CURSOR === "1"
+      ? { data: [thread], nextCursor: "fictional-repeated-page" }
+      : request.params?.limit === 1
       ? (cursor ? { data: [ephemeral], nextCursor: null } : { data: [thread], nextCursor: "fictional-page-2" })
       : { data: [thread, ephemeral], nextCursor: null };
   }
@@ -88,7 +90,10 @@ const stateDirectory = process.env.TEST_STATE_DIR || path.join(process.env.HOME 
 fs.mkdirSync(stateDirectory, { recursive: true });
 const state = path.join(stateDirectory, "capture.launchd");
 if (args[0] === "print") process.exit(fs.existsSync(state) ? 0 : 1);
-if (args[0] === "bootstrap") { fs.writeFileSync(state, args.join(" ") + "\n"); process.exit(0); }
+if (args[0] === "bootstrap") {
+  if (process.env.TEST_LAUNCHCTL_FAIL_BOOTSTRAP === "1") { process.stderr.write("fictional bootstrap failure\n"); process.exit(1); }
+  fs.writeFileSync(state, args.join(" ") + "\n"); process.exit(0);
+}
 if (args[0] === "bootout") { fs.rmSync(state, { force: true }); process.exit(0); }
 process.exit(2);
 `;

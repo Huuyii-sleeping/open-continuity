@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultConfig } from "../src/cli/config.js";
 import { connectAgent, connectorStatus, disconnectAgent } from "../src/cli/connectors.js";
+import { installFakeClaudeCli } from "./helpers/fake-claude.js";
 
 describe("agent connectors", () => {
   const directories: string[] = [];
@@ -57,5 +58,24 @@ esac
   it("refuses to persist an ephemeral npx cache path", () => {
     const { env } = environment();
     expect(() => connectAgent("trae", defaultConfig(env), "/tmp/.npm/_npx/demo/node_modules/open-continuity/dist/src/server.js", env)).toThrow("ephemeral npx cache");
+  });
+
+  it("places the Claude server name before variadic environment options", () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-claude-connector-")); directories.push(root);
+    const bin = installFakeClaudeCli(root);
+    const state = join(root, "state"); mkdirSync(state);
+    const env = {
+      ...process.env,
+      HOME: join(root, "home"),
+      OPEN_CONTINUITY_HOME: join(root, "data"),
+      PATH: `${bin}:${process.env.PATH}`,
+      TEST_STATE_DIR: state,
+    };
+    const config = defaultConfig(env);
+    connectAgent("claude", config, "/tmp/open-continuity/server.js", env);
+    const args = JSON.parse(readFileSync(join(state, "open_continuity.mcp"), "utf8")) as string[];
+    expect(args.indexOf("open_continuity")).toBeGreaterThan(args.indexOf("stdio"));
+    expect(args.indexOf("open_continuity")).toBeLessThan(args.indexOf("--env"));
+    expect(args).toContain(`OPEN_CONTINUITY_AGENT_ID=claude`);
   });
 });

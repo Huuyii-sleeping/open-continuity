@@ -1,13 +1,16 @@
-import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { isWorkspaceAllowed, normalizeWorkspacePath, saveConfig, type LocalConfig } from "./config.js";
-import { connectAgent, connectorStatus, findExecutable } from "./connectors.js";
+import { adapterCaptureConfig, adapterInjectionConfig, configPath, isWorkspaceAllowed, normalizeWorkspacePath, saveConfig, type LocalConfig } from "./config.js";
+import { connectAgent, connectorStatus, findExecutable, rollbackAgentConnection } from "./connectors.js";
 import { runDoctor, type DoctorCheck } from "./doctor.js";
 import { ConversationInbox } from "../capture/conversation-inbox.js";
 import { captureDatabasePath } from "../capture/paths.js";
 import { checkCodexHooks, installCodexHooks, type CodexHookPaths } from "../injection/codex-hook-config.js";
+import { codexHooksPath } from "../capture/codex-app-server.js";
 import { codexCaptureDoctor, captureCodexStatus } from "../capture/codex-capture-service.js";
 import { SqliteMemoryStore } from "../sqlite/sqlite-memory-store.js";
+import { isRegularHookFile } from "../injection/hook-health.js";
+import { hookManifestPath } from "../injection/hook-manifest.js";
+import { restoreFile, restoreObject, SetupTransaction, snapshotFile } from "./setup-transaction.js";
 
 export interface CodexAdapterPaths extends CodexHookPaths { serverPath: string; nodePath: string; }
 
@@ -28,6 +31,8 @@ export async function doctorCodexAdapter(
   workspace?: string,
 ): Promise<{ ok: boolean; adapter: "codex"; checks: DoctorCheck[]; manualActions: string[] }> {
   const checks: DoctorCheck[] = [];
+  const injection = adapterInjectionConfig(config, "codex");
+  const captureConfig = adapterCaptureConfig(config, "codex");
   const capabilities = probeCodex(env);
   checks.push(check("Codex installation", capabilities.binary ? "pass" : "fail", capabilities.version || capabilities.binary || "Codex executable not found"));
   checks.push(check("Codex app-server", capabilities.appServer ? "pass" : "fail", capabilities.appServer ? "app-server is available" : "Codex app-server is unavailable"));
@@ -42,18 +47,18 @@ export async function doctorCodexAdapter(
     .map((entry) => ({ ...entry, name: `OpenContinuity ${entry.name}` })));
 
   const hooks = checkCodexHooks(env, paths.nodePath, paths);
-  checks.push(check("Codex UserPromptSubmit hook", hooks.valid && hooks.injectionInstalled && existsSync(paths.injectionHookPath) ? "pass" : "fail",
-    hooks.injectionInstalled ? (existsSync(paths.injectionHookPath) ? hooks.path : `hook entry exists but executable is missing: ${paths.injectionHookPath}`) : hooks.detail || "not installed"));
-  checks.push(check("Codex Stop Capture hook", hooks.valid && hooks.captureInstalled && existsSync(paths.captureHookPath) ? "pass" : "fail",
-    hooks.captureInstalled ? (existsSync(paths.captureHookPath) ? hooks.path : `hook entry exists but executable is missing: ${paths.captureHookPath}`) : hooks.detail || "not installed"));
+  checks.push(check("Codex UserPromptSubmit hook", hooks.valid && hooks.injectionInstalled && isRegularHookFile(paths.injectionHookPath) ? "pass" : "fail",
+    hooks.injectionInstalled ? (isRegularHookFile(paths.injectionHookPath) ? hooks.path : `hook entry exists but executable is missing: ${paths.injectionHookPath}`) : hooks.detail || "not installed"));
+  checks.push(check("Codex Stop Capture hook", hooks.valid && hooks.captureInstalled && isRegularHookFile(paths.captureHookPath) ? "pass" : "fail",
+    hooks.captureInstalled ? (isRegularHookFile(paths.captureHookPath) ? hooks.path : `hook entry exists but executable is missing: ${paths.captureHookPath}`) : hooks.detail || "not installed"));
 
   const normalizedWorkspace = workspace ? normalizeWorkspacePath(workspace) : undefined;
-  const injectionAllowed = normalizedWorkspace ? isWorkspaceAllowed(config.injection.workspaces, normalizedWorkspace) : config.injection.workspaces.length > 0;
-  checks.push(check("Injection allowlist", config.injection.enabled && injectionAllowed ? "pass" : "fail",
-    !config.injection.enabled ? "injection is disabled" : normalizedWorkspace && !injectionAllowed ? `${normalizedWorkspace} is not allowlisted` : `${config.injection.workspaces.length} workspace(s) allowlisted`));
-  const captureAllowed = normalizedWorkspace ? isWorkspaceAllowed(config.capture.workspaces, normalizedWorkspace) : config.capture.workspaces.length > 0;
-  checks.push(check("Capture allowlist", config.capture.enabled && captureAllowed ? "pass" : "fail",
-    !config.capture.enabled ? "capture is disabled" : normalizedWorkspace && !captureAllowed ? `${normalizedWorkspace} is not allowlisted` : `${config.capture.workspaces.length} workspace(s) allowlisted`));
+  const injectionAllowed = normalizedWorkspace ? isWorkspaceAllowed(injection.workspaces, normalizedWorkspace) : injection.workspaces.length > 0;
+  checks.push(check("Injection allowlist", injection.enabled && injectionAllowed ? "pass" : "fail",
+    !injection.enabled ? "injection is disabled" : normalizedWorkspace && !injectionAllowed ? `${normalizedWorkspace} is not allowlisted` : `${injection.workspaces.length} workspace(s) allowlisted`));
+  const captureAllowed = normalizedWorkspace ? isWorkspaceAllowed(captureConfig.workspaces, normalizedWorkspace) : captureConfig.workspaces.length > 0;
+  checks.push(check("Capture allowlist", captureConfig.enabled && captureAllowed ? "pass" : "fail",
+    !captureConfig.enabled ? "capture is disabled" : normalizedWorkspace && !captureAllowed ? `${normalizedWorkspace} is not allowlisted` : `${captureConfig.workspaces.length} workspace(s) allowlisted`));
 
   const status = captureCodexStatus(env);
   const failures = Number(status.sync?.consecutive_failures ?? 0);
@@ -76,31 +81,56 @@ export async function setupCodexAdapter(
   input: { workspace: string; force?: boolean },
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  const workspace = normalizeWorkspacePath(input.workspace);
-  const capabilities = probeCodex(env);
-  if (!capabilities.binary) throw new Error("Codex executable was not found in PATH");
-  if (!capabilities.appServer) throw new Error("Codex app-server is unavailable in this installation");
-  new SqliteMemoryStore(config.databasePath).close();
+  const transaction = new SetupTransaction("codex", ["preflight", "store", "mcp", "hooks", "config", "verify"]);
+  const configBefore = structuredClone(config);
+  const snapshots = [snapshotFile(configPath(env)), snapshotFile(codexHooksPath(env)), snapshotFile(hookManifestPath(env))];
+  transaction.addRollback("restore_local_config_and_hooks", () => {
+    for (const snapshot of [...snapshots].reverse()) restoreFile(snapshot);
+    restoreObject(config, configBefore);
+  });
+  try {
+    const workspace = normalizeWorkspacePath(input.workspace);
+    const capabilities = await transaction.apply("preflight", () => {
+      const result = probeCodex(env);
+      if (!result.binary) throw new Error("Codex executable was not found in PATH");
+      if (!result.appServer) throw new Error("Codex app-server is unavailable in this installation");
+      return result;
+    }, (result) => result.version || result.binary || undefined);
+    await transaction.apply("store", () => { new SqliteMemoryStore(config.databasePath).close(); }, () => "SQLite ready");
 
-  const before = connectorStatus("codex", config, env, { serverPath: paths.serverPath, nodePath: paths.nodePath });
-  const managed = Boolean(config.connectedAgents.codex);
-  let mcp: { changed: boolean; binary?: string; backupPath?: string } = { changed: false };
-  if (!before.configured || !managed) {
-    if (before.configured && !managed && !input.force) throw new Error("An unmanaged open_continuity MCP entry already exists in Codex. Rerun with --force after reviewing it.");
-    mcp = { changed: true, ...connectAgent("codex", config, paths.serverPath, env, Boolean(input.force || managed)) };
+    const connectorBefore = connectorStatus("codex", config, env, { serverPath: paths.serverPath, nodePath: paths.nodePath });
+    const managed = Boolean(config.connectedAgents.codex);
+    const previousConnection = structuredClone(config.connectedAgents.codex);
+    let mcp: { changed: boolean; binary?: string; backupPath?: string } = { changed: false };
+    mcp = await transaction.apply("mcp", () => {
+      if (connectorBefore.configured && managed) return mcp;
+      if (connectorBefore.configured && !managed && !input.force) throw new Error("An unmanaged open_continuity MCP entry already exists in Codex. Rerun with --force after reviewing it.");
+      return { changed: true, ...connectAgent("codex", config, paths.serverPath, env, Boolean(input.force || managed)) };
+    }, (result) => result.changed ? "connected" : "already connected");
+    if (mcp.changed) transaction.addRollback("restore_codex_mcp", () => rollbackAgentConnection("codex", config, previousConnection, env));
+
+    const hooks = await transaction.apply("hooks", () => installCodexHooks(env, paths.nodePath, paths), (result) => result.changed ? "installed or reconciled" : "already current");
+    const adapter = config.adapters.codex;
+    await transaction.apply("config", () => {
+      adapter.injection = { enabled: true, workspaces: [...new Set([...adapter.injection.workspaces.map(normalizeWorkspacePath), workspace])] };
+      adapter.capture = { enabled: true, workspaces: [...new Set([...adapter.capture.workspaces.map(normalizeWorkspacePath), workspace])] };
+      saveConfig(config, env);
+    }, () => "Codex permissions enabled");
+    const doctor = await transaction.apply("verify", async () => {
+      const result = await doctorCodexAdapter(config, paths, env, workspace);
+      if (!result.ok) throw new Error("Codex setup verification failed");
+      return result;
+    }, () => "doctor passed");
+    transaction.verified("verify", "doctor passed");
+    return {
+      ok: true, operation: "setup_codex", adapter: "codex", workspace,
+      steps: {
+        captureCapability: { ok: true, mode: "Stop hook + app-server", version: capabilities.version },
+        mcp, injection: { enabled: true, hookChanged: hooks.changed, hookPath: paths.injectionHookPath },
+        capture: { enabled: true, hookChanged: hooks.changed, hookPath: paths.captureHookPath, workspaces: adapter.capture.workspaces },
+      }, transaction: transaction.complete(), doctor,
+    };
+  } catch (error) {
+    throw await transaction.rollbackAndWrap(error);
   }
-
-  const hooks = installCodexHooks(env, paths.nodePath, paths);
-  config.injection = { ...config.injection, enabled: true, workspaces: [...new Set([...config.injection.workspaces.map(normalizeWorkspacePath), workspace])] };
-  config.capture = { ...config.capture, enabled: true, workspaces: [...new Set([...config.capture.workspaces.map(normalizeWorkspacePath), workspace])] };
-  saveConfig(config, env);
-  const doctor = await doctorCodexAdapter(config, paths, env, workspace);
-  return {
-    ok: doctor.ok, operation: "setup_codex", adapter: "codex", workspace,
-    steps: {
-      captureCapability: { ok: true, mode: "Stop hook + app-server", version: capabilities.version },
-      mcp, injection: { enabled: true, hookChanged: hooks.changed, hookPath: paths.injectionHookPath },
-      capture: { enabled: true, hookChanged: hooks.changed, hookPath: paths.captureHookPath, workspaces: config.capture.workspaces },
-    }, doctor,
-  };
 }
