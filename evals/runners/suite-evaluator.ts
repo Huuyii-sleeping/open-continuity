@@ -88,7 +88,8 @@ async function evaluateInjectionCase(testCase: InjectionCase, round: number, lat
     const outsideWorkspace = join(root, "outside-workspace");
     const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data") };
     const config = defaultConfig(env);
-    config.injection = { ...config.injection, enabled: true, workspaces: [workspace], maxMemories: 8 };
+    config.injection = { ...config.injection, maxMemories: 8 };
+    config.adapters.trae.injection = { enabled: true, workspaces: [workspace] };
     saveConfig(config, env);
     const labelsToIds = new Map<string, string>();
     const service = new MemoryService(new SqliteMemoryStore(config.databasePath));
@@ -158,13 +159,13 @@ async function evaluateGovernanceCase(testCase: GovernanceCase, round: number): 
       detail.pass = Boolean(result.backupPath && existsSync(result.backupPath)) && JSON.parse(readFileSync(path, "utf8")).hooks.UserPromptSubmit.length === 2;
     } else if (testCase.id === "watch-incremental-abort") {
       const bin = installFakeTraeCli(root); const workspace = join(root, "fictional-suite"); const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), TEST_TRAE_WORKSPACE: workspace, PATH: `${bin}${delimiter}${process.env.PATH || ""}` };
-      const config = defaultConfig(env); config.capture = { ...config.capture, enabled: true, workspaces: [workspace] }; saveConfig(config, env);
+      const config = defaultConfig(env); config.adapters.trae.capture = { enabled: true, workspaces: [workspace] }; saveConfig(config, env);
       const controller = new AbortController(); const cycles: Array<{ imported: number; skipped: number }> = [];
       const result = await watchTraeCapture({ limit: 10, intervalMs: 20, onCycle: (cycle) => { cycles.push({ imported: cycle.threadsImported, skipped: cycle.skippedUnchanged ?? 0 }); if (cycles.length === 2) controller.abort(); } }, env, controller.signal);
       detail.pass = result.cycles === 2 && cycles[0]?.imported === 1 && cycles[1]?.skipped === 1;
     } else if (testCase.id === "failure-fail-open") {
-      const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data") }; const config = defaultConfig(env); config.injection = { ...config.injection, enabled: true, workspaces: [join(root, "workspace")], timeoutMs: 10 }; saveConfig(config, env);
-      const timeout = await runInjectionHook({ prompt: "虚构故障测试", cwd: join(root, "workspace") }, env, { createService: () => ({ context: async () => { await new Promise((resolve) => setTimeout(resolve, 30)); return { context: "late", items: [], omitted: [], budget: { requestedTokens: 64, usedTokens: 0, remainingTokens: 64, maxMemories: 1, estimation: "utf8_bytes_v1" } }; }, close: async () => undefined }) });
+      const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data") }; const config = defaultConfig(env); config.injection = { ...config.injection, timeoutMs: 25 }; config.adapters.trae.injection = { enabled: true, workspaces: [join(root, "workspace")] }; saveConfig(config, env);
+      const timeout = await runInjectionHook({ prompt: "虚构故障测试", cwd: join(root, "workspace") }, env, { createService: () => ({ context: async () => { await new Promise((resolve) => setTimeout(resolve, 60)); return { context: "late", items: [], omitted: [], budget: { requestedTokens: 64, usedTokens: 0, remainingTokens: 64, maxMemories: 1, estimation: "utf8_bytes_v1" } }; }, close: async () => undefined }) });
       detail.pass = timeout.continue === true && !timeout.hookSpecificOutput;
     }
     return { id: testCase.id, round, passed: detail.pass === true, detail: JSON.stringify(detail) };

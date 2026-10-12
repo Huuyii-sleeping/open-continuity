@@ -1,6 +1,6 @@
 import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, delimiter, join, resolve } from "node:path";
+import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import type { AgentName, LocalConfig } from "./config.js";
 import { continuityHome, saveConfig } from "./config.js";
@@ -29,7 +29,10 @@ const connectors: Record<AgentName, Connector> = {
   },
   claude: {
     candidates: ["claude"], configPath: (env) => join(userHome(env), ".claude.json"),
-    addArgs: (server, config) => ["mcp", "add", "--scope", "user", "--transport", "stdio", ...commonEnv(config, "claude"), MCP_SERVER_NAME, "--", process.execPath, server, "--mcp"],
+    // Claude's --env option is variadic. The positional server name must come
+    // before the first --env or current Claude Code builds consume the name as
+    // another environment entry and reject it.
+    addArgs: (server, config) => ["mcp", "add", "--scope", "user", "--transport", "stdio", MCP_SERVER_NAME, ...commonEnv(config, "claude"), "--", process.execPath, server, "--mcp"],
     removeArgs: ["mcp", "remove", "--scope", "user", MCP_SERVER_NAME], getArgs: ["mcp", "get", MCP_SERVER_NAME],
   },
 };
@@ -102,6 +105,27 @@ export function disconnectAgent(agent: AgentName, config: LocalConfig, env: Node
   const result = run(binary, connector.removeArgs, env);
   if (!result.ok) throw new Error(`Unable to disconnect ${agent}: ${result.output}`);
   delete config.connectedAgents[agent];
+  saveConfig(config, env);
+}
+
+export function rollbackAgentConnection(
+  agent: AgentName,
+  config: LocalConfig,
+  previous: LocalConfig["connectedAgents"][AgentName],
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  const connector = connectors[agent];
+  const current = config.connectedAgents[agent];
+  const binary = current?.binary || findExecutable(connector.candidates, env);
+  if (!binary) throw new Error(`Unable to roll back ${agent} MCP connection because its CLI is unavailable.`);
+  const removed = run(binary, connector.removeArgs, env);
+  if (!removed.ok) throw new Error(`Unable to remove the new ${agent} MCP connection during rollback: ${removed.output}`);
+  if (current?.backupPath && existsSync(current.backupPath)) {
+    mkdirSync(dirname(connector.configPath(env)), { recursive: true, mode: 0o700 });
+    copyFileSync(current.backupPath, connector.configPath(env));
+  }
+  if (previous) config.connectedAgents[agent] = previous;
+  else delete config.connectedAgents[agent];
   saveConfig(config, env);
 }
 

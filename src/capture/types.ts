@@ -39,6 +39,12 @@ export interface ConversationThread {
   updatedAt: string;
   preview: string;
   turns: ConversationTurn[];
+  /** Opaque adapter-owned resume token persisted with the durable checkpoint. */
+  captureCursor?: string;
+  /** True when this snapshot contains only records after the supplied checkpoint cursor. */
+  captureDelta?: boolean;
+  /** Exact checkpoint cursor used as the base of a delta snapshot. */
+  captureBaseCursor?: string;
 }
 
 export type CandidateStatus = "pending" | "approved" | "rejected";
@@ -106,6 +112,8 @@ export interface CaptureCheckpoint {
   lastItemId?: string;
   lastItemCount: number;
   syncedAt: string;
+  /** Opaque adapter-owned resume token, when the source supports incremental reads. */
+  cursor?: string;
 }
 
 export interface CaptureCheckpointStatus {

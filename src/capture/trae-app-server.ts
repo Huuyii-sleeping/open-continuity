@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { z } from "zod";
 import { findExecutable } from "../cli/connectors.js";
 import type { ConversationItem, ConversationThread, ConversationTurn } from "./types.js";
-import type { CaptureAdapter, CaptureListResult, CaptureThreadReference } from "../adapters/contracts.js";
+import type { CaptureAdapter, CaptureListResult, CaptureReadOptions, CaptureThreadReference } from "../adapters/contracts.js";
 
 const userInputSchema = z.object({ type: z.string(), text: z.string().optional() }).passthrough();
 const threadItemSchema = z.object({ id: z.string(), type: z.string() }).passthrough();
@@ -117,7 +117,9 @@ export class TraeAppServerClient implements CaptureAdapter {
     const threads: Array<z.infer<typeof threadSchema>> = [];
     let cursor: string | undefined;
     let pages = 0;
+    const seenCursors = new Set<string>();
     do {
+      if (pages >= Math.max(1, maxThreads)) throw new Error("Trae app-server thread pagination exceeded its page bound");
       const result = listResultSchema.parse(await this.request("thread/list", {
         limit: Math.min(pageSize, maxThreads - threads.length),
         ...(cursor ? { cursor } : {}),
@@ -125,7 +127,10 @@ export class TraeAppServerClient implements CaptureAdapter {
       }));
       pages += 1;
       threads.push(...result.data);
-      cursor = result.nextCursor ?? undefined;
+      const nextCursor = result.nextCursor ?? undefined;
+      if (nextCursor && seenCursors.has(nextCursor)) throw new Error("Trae app-server returned a repeated thread cursor");
+      if (nextCursor) seenCursors.add(nextCursor);
+      cursor = nextCursor;
     } while (cursor && threads.length < maxThreads);
     const references: CaptureThreadReference[] = threads.slice(0, maxThreads).map((thread) => ({
       id: thread.id, cwd: thread.cwd, updatedAt: timestamp(thread.updatedAt)!, ephemeral: thread.ephemeral,
@@ -133,7 +138,7 @@ export class TraeAppServerClient implements CaptureAdapter {
     return { threads: references, pages, truncated: Boolean(cursor) };
   }
 
-  async readThread(threadId: string): Promise<ConversationThread> {
+  async readThread(threadId: string, _options?: CaptureReadOptions): Promise<ConversationThread> {
     const result = readResultSchema.parse(await this.request("thread/read", { threadId, includeTurns: true }));
     return normalizeThread(result.thread);
   }

@@ -30,7 +30,7 @@ describe("Trae conversation capture", () => {
 
   function enableCapture(env: NodeJS.ProcessEnv, workspace: string): void {
     const config = defaultConfig(env);
-    config.capture = { ...config.capture, enabled: true, workspaces: [workspace] };
+    config.adapters.trae.capture = { enabled: true, workspaces: [workspace] };
     saveConfig(config, env);
   }
 
@@ -235,6 +235,18 @@ describe("Trae conversation capture", () => {
     enableCapture(env, workspace);
     const sync = await syncTraeCapture({ limit: 1, maxThreads: 10 }, env);
     expect(sync).toMatchObject({ threadsSeen: 2, pagesScanned: 2, skippedEphemeral: 1, threadsImported: 1 });
+  });
+
+  it("rejects a repeated Trae thread-list cursor", async () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-capture-repeated-page-")); directories.push(root);
+    const bin = installFakeTraeCli(root);
+    const workspace = join(root, "fictional-workspace");
+    const env = {
+      ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), PATH: bin,
+      TEST_TRAE_WORKSPACE: workspace, TEST_TRAE_REPEAT_THREAD_CURSOR: "1",
+    };
+    enableCapture(env, workspace);
+    await expect(syncTraeCapture({ limit: 1, maxThreads: 10 }, env)).rejects.toThrow("repeated thread cursor");
   });
 
   it("requires Capture opt-in and never persists threads outside the workspace allowlist", async () => {

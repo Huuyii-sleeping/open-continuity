@@ -11,6 +11,7 @@ import { createInterface } from "node:readline";
 const args = process.argv.slice(2);
 const state = process.env.FICTIONAL_CODEX_STATE;
 const workspace = process.env.FICTIONAL_CODEX_WORKSPACE;
+const paginateTurns = process.env.FICTIONAL_CODEX_PAGINATE_TURNS === "1";
 const threadId = "fictional-codex-session";
 if (args[0] === "--version") { process.stdout.write("0.0.0-fictional\\n"); process.exit(0); }
 if (args[0] === "app-server" && args.includes("--help")) { process.stdout.write("fictional app-server\\n"); process.exit(0); }
@@ -32,11 +33,25 @@ const turns = [{
     { type: "contextCompaction", id: "fictional-codex-compaction" },
   ],
 }];
+const secondTurn = {
+  id: "fictional-codex-turn-2", status: "completed", startedAt: 1893456040, completedAt: 1893456070,
+  items: [
+    { type: "userMessage", id: "fictional-codex-user-2", content: [{ type: "text", text: "继续处理第二轮虚构任务。" }] },
+    { type: "agentMessage", id: "fictional-codex-assistant-2", text: "第二轮虚构任务已完成。", phase: "final_answer" },
+  ],
+};
 function respond(message) {
   if (message.method === "initialize") return { id: message.id, result: { userAgent: "Codex/0.0.0-fictional", codexHome: process.env.CODEX_HOME || "/fictional-codex-home", platformFamily: "unix", platformOs: "fictional" } };
-  if (message.method === "thread/list") return { id: message.id, result: { data: [{ id: threadId, sessionId: threadId, cwd: workspace, cliVersion: "0.0.0-fictional", preview: "虚构 Codex 会话", createdAt: 1893456000, updatedAt: 1893456030, ephemeral: false }], nextCursor: null } };
+  if (message.method === "thread/list") return { id: message.id, result: { data: [{ id: threadId, sessionId: threadId, cwd: workspace, cliVersion: "0.0.0-fictional", preview: "虚构 Codex 会话", createdAt: 1893456000, updatedAt: 1893456030, ephemeral: false }], nextCursor: process.env.FICTIONAL_CODEX_REPEAT_THREAD_CURSOR === "1" ? "fictional-repeated-page" : null } };
   if (message.method === "thread/read") return { id: message.id, result: { thread: { id: threadId, sessionId: threadId, cwd: workspace, cliVersion: "0.0.0-fictional", preview: "虚构 Codex 会话", createdAt: 1893456000, updatedAt: 1893456030, ephemeral: false, turns: [] } } };
-  if (message.method === "thread/turns/list") return { id: message.id, result: turns };
+  if (message.method === "thread/turns/list") {
+    if (!paginateTurns) return { id: message.id, result: turns };
+    const cursor = message.params?.cursor;
+    if (cursor && process.env.FICTIONAL_CODEX_FAIL_SECOND_TURN_PAGE === "1") return { id: message.id, error: { message: "fictional second page failure" } };
+    return cursor
+      ? { id: message.id, result: { data: [secondTurn], nextCursor: null } }
+      : { id: message.id, result: { data: turns.slice(0, 1), nextCursor: "fictional-turn-page-2" } };
+  }
   return { id: message.id, result: {} };
 }
 for await (const line of createInterface({ input: process.stdin })) {

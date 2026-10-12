@@ -1,5 +1,5 @@
 import type { LocalConfig } from "../cli/config.js";
-import { loadConfig } from "../cli/config.js";
+import { adapterCaptureConfig, loadConfig } from "../cli/config.js";
 import { ConversationInbox } from "./conversation-inbox.js";
 import { probeTraeCapture, TraeAppServerClient, type TraeCaptureCapabilities } from "./trae-app-server.js";
 import type { CaptureSyncResult, MemoryCandidate } from "./types.js";
@@ -26,7 +26,8 @@ export async function syncTraeCapture(input: { threadId?: string; limit?: number
   const lock = input.lock === false ? undefined : acquireCaptureLock(env);
   try {
     const config = loadConfig(env);
-    if (!config?.capture.enabled || config.capture.workspaces.length === 0) {
+    const capture = config ? adapterCaptureConfig(config, "trae") : null;
+    if (!capture?.enabled || capture.workspaces.length === 0) {
       throw new Error("Conversation Capture is disabled or has no allowlisted workspace. Run `open-continuity capture enable <workspace>` first.");
     }
     const capabilities = probeTraeCapture(env);
@@ -37,8 +38,8 @@ export async function syncTraeCapture(input: { threadId?: string; limit?: number
     try {
       const imported = await syncCaptureAdapter(client, inbox, {
         threadId: input.threadId, limit: input.limit, maxThreads: input.maxThreads,
-        workspaces: config.capture.workspaces,
-        ...(config.capture.autoCleanup ? { retentionDays: config.capture.retentionDays, pendingCandidateRetentionDays: config.capture.pendingCandidateRetentionDays } : {}),
+        workspaces: capture.workspaces,
+        ...(capture.autoCleanup ? { retentionDays: capture.retentionDays, pendingCandidateRetentionDays: capture.pendingCandidateRetentionDays } : {}),
       });
       return { ...imported, inboxPath };
     } finally { inbox.close(); }

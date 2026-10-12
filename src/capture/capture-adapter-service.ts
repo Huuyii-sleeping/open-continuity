@@ -1,5 +1,5 @@
 import { isWorkspaceAllowed } from "../cli/config.js";
-import type { CaptureAdapter } from "../adapters/contracts.js";
+import type { CaptureAdapter, CaptureReadOptions } from "../adapters/contracts.js";
 import { ConversationInbox } from "./conversation-inbox.js";
 import type { CaptureSyncResult, ConversationThread } from "./types.js";
 
@@ -17,6 +17,26 @@ function retainedPreview(thread: ConversationThread): string {
   return thread.turns.flatMap((turn) => turn.items)
     .find((item) => item.type === "user_message" && item.text)?.text?.slice(0, 240)
     ?? "Conversation metadata retained after raw-content expiry";
+}
+
+function validateCaptureThread(thread: ConversationThread, threadId: string, source: string, options?: CaptureReadOptions): void {
+  if (thread.source !== source) throw new Error("Capture Adapter " + source + " returned mismatched source " + thread.source);
+  if (thread.id !== threadId) throw new Error("Capture Adapter " + source + " returned mismatched thread " + thread.id);
+  if (thread.captureCursor != null && (!thread.captureCursor || typeof thread.captureCursor !== "string")) {
+    throw new Error("Capture Adapter " + source + " returned an invalid capture cursor");
+  }
+  if (thread.captureBaseCursor != null && (!thread.captureBaseCursor || typeof thread.captureBaseCursor !== "string")) {
+    throw new Error("Capture Adapter " + source + " returned an invalid capture base cursor");
+  }
+  if (thread.captureDelta === true) {
+    if (!options?.checkpoint?.cursor) throw new Error("Capture Adapter " + source + " returned a delta without a checkpoint cursor");
+    if (thread.captureBaseCursor !== options.checkpoint.cursor) {
+      throw new Error("Capture Adapter " + source + " returned a delta based on a different checkpoint cursor");
+    }
+    if (!thread.captureCursor) throw new Error("Capture Adapter " + source + " returned a delta without a next cursor");
+  } else if (thread.captureBaseCursor != null) {
+    throw new Error("Capture Adapter " + source + " returned a base cursor for a full snapshot");
+  }
 }
 
 export function applyConversationRetention(thread: ConversationThread, retentionDays: number, now = Date.now()): ConversationThread {
@@ -49,8 +69,9 @@ export async function syncCaptureAdapter(
     const skippedNotAllowed = listedThreads ? listedThreads.filter((thread) => !thread.ephemeral && !isWorkspaceAllowed(input.workspaces, thread.cwd)).length : 0;
     const threads = [];
     for (const threadId of threadIds) {
-      const thread = await adapter.readThread(threadId);
-      if (thread.source !== adapter.id) throw new Error(`Capture Adapter ${adapter.id} returned mismatched source ${thread.source}`);
+      const checkpoint = inbox.readCheckpoint(threadId, adapter.id);
+      const thread = await adapter.readThread(threadId, checkpoint ? { checkpoint } : undefined);
+      validateCaptureThread(thread, threadId, adapter.id, checkpoint ? { checkpoint } : undefined);
       if (!isWorkspaceAllowed(input.workspaces, thread.cwd)) {
         if (input.threadId) throw new Error(`Thread workspace is not allowlisted for Capture: ${thread.cwd}`);
         continue;

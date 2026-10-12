@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { CaptureAdapter, CaptureListResult, InjectionAdapter } from "../src/adapters/contracts.js";
+import type { CaptureAdapter, CaptureListResult, CaptureReadOptions, InjectionAdapter } from "../src/adapters/contracts.js";
+import { createInjectionAdapter } from "../src/adapters/registry.js";
 import { syncCaptureAdapter } from "../src/capture/capture-adapter-service.js";
 import { ConversationInbox } from "../src/capture/conversation-inbox.js";
 import type { ConversationThread } from "../src/capture/types.js";
@@ -13,6 +14,7 @@ class FictionalCaptureAdapter implements CaptureAdapter {
   readonly id = "fictional-agent";
   connected = false;
   closed = false;
+  readonly readOptions: Array<CaptureReadOptions | undefined> = [];
 
   constructor(private readonly threads: ConversationThread[]) {}
 
@@ -25,7 +27,8 @@ class FictionalCaptureAdapter implements CaptureAdapter {
       truncated: false,
     };
   }
-  async readThread(threadId: string): Promise<ConversationThread> {
+  async readThread(threadId: string, options?: CaptureReadOptions): Promise<ConversationThread> {
+    this.readOptions.push(options);
     const thread = this.threads.find((entry) => entry.id === threadId);
     if (!thread) throw new Error("fictional thread not found");
     return thread;
@@ -64,6 +67,34 @@ describe("Agent Adapter contracts", () => {
     } finally { inbox.close(); }
   });
 
+  it("forwards durable checkpoints and enforces delta snapshot semantics", async () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-adapter-checkpoint-")); directories.push(root);
+    const allowed = join(root, "allowed");
+    const checkpointed = { ...thread("checkpointed", allowed), captureCursor: "fictional-cursor-v1" };
+    const adapter = new FictionalCaptureAdapter([checkpointed]);
+    const inbox = new ConversationInbox(join(root, "capture.db"));
+    try {
+      await syncCaptureAdapter(adapter, inbox, { threadId: checkpointed.id, workspaces: [allowed] });
+      const checkpoint = inbox.readCheckpoint(checkpointed.id, adapter.id);
+      expect(checkpoint).toMatchObject({ cursor: "fictional-cursor-v1" });
+
+      checkpointed.updatedAt = "2030-01-01T00:02:00.000Z";
+      await syncCaptureAdapter(adapter, inbox, { threadId: checkpointed.id, workspaces: [allowed] });
+      expect(adapter.readOptions[1]).toMatchObject({ checkpoint: { cursor: "fictional-cursor-v1", threadId: checkpointed.id } });
+
+      const invalidDelta = new FictionalCaptureAdapter([{ ...thread("invalid-delta", allowed), captureDelta: true }]);
+      await expect(syncCaptureAdapter(invalidDelta, inbox, { threadId: "invalid-delta", workspaces: [allowed] }))
+        .rejects.toThrow("returned a delta without a checkpoint cursor");
+
+      const wrongBase = new FictionalCaptureAdapter([{
+        ...thread("checkpointed", allowed), updatedAt: "2030-01-01T00:03:00.000Z",
+        captureDelta: true, captureBaseCursor: "wrong-cursor", captureCursor: "fictional-cursor-v2",
+      }]);
+      await expect(syncCaptureAdapter(wrongBase, inbox, { threadId: "checkpointed", workspaces: [allowed] }))
+        .rejects.toThrow("returned a delta based on a different checkpoint cursor");
+    } finally { inbox.close(); }
+  });
+
   it("implements the generic Injection contract with the Trae Adapter", () => {
     const root = mkdtempSync(join(tmpdir(), "open-continuity-injection-contract-")); directories.push(root);
     const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data"), TRAECLI_HOME: join(root, "trae-cli") };
@@ -74,5 +105,18 @@ describe("Agent Adapter contracts", () => {
     expect(adapter.check()).toMatchObject({ valid: true, installed: false });
     expect(adapter.install()).toMatchObject({ valid: true, installed: true, changed: true });
     expect(adapter.install()).toMatchObject({ valid: true, installed: true, changed: false });
+  });
+
+  it("selects every Injection Adapter through the shared registry", () => {
+    const root = mkdtempSync(join(tmpdir(), "open-continuity-adapter-registry-")); directories.push(root);
+    const paths = {
+      trae: { injectionHookPath: join(root, "trae-injection.js") },
+      claude: { injectionHookPath: join(root, "claude-injection.js"), captureHookPath: join(root, "claude-capture.js") },
+      codex: { injectionHookPath: join(root, "codex-injection.js"), captureHookPath: join(root, "codex-capture.js") },
+    };
+    const env = { ...process.env, HOME: join(root, "home"), OPEN_CONTINUITY_HOME: join(root, "data") };
+    expect(createInjectionAdapter("trae", env, process.execPath, paths).id).toBe("trae");
+    expect(createInjectionAdapter("claude", env, process.execPath, paths).id).toBe("claude");
+    expect(createInjectionAdapter("codex", env, process.execPath, paths).id).toBe("codex");
   });
 });

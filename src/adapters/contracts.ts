@@ -1,4 +1,4 @@
-import type { ConversationThread } from "../capture/types.js";
+import type { CaptureCheckpoint, ConversationThread } from "../capture/types.js";
 
 export interface CaptureThreadReference {
   id: string;
@@ -13,11 +13,16 @@ export interface CaptureListResult {
   truncated: boolean;
 }
 
+export interface CaptureReadOptions {
+  /** Durable source-specific position from a previous successful import. */
+  checkpoint?: CaptureCheckpoint;
+}
+
 export interface CaptureAdapter {
   readonly id: string;
   connect(): Promise<void>;
   listThreads(input?: { pageSize?: number; maxThreads?: number }): Promise<CaptureListResult>;
-  readThread(threadId: string): Promise<ConversationThread>;
+  readThread(threadId: string, options?: CaptureReadOptions): Promise<ConversationThread>;
   close(): Promise<void>;
 }
 
@@ -31,6 +36,10 @@ export interface InjectionAdapterInstallResult extends InjectionAdapterStatus {
   changed: boolean;
 }
 
+export interface InjectionAdapterUninstallResult extends InjectionAdapterStatus {
+  changed: boolean;
+}
+
 export interface InjectionAdapter<TOutput> {
   readonly id: string;
   readonly hookEvent: string;
@@ -38,4 +47,5 @@ export interface InjectionAdapter<TOutput> {
   renderContext(context: string): TOutput;
   check(): InjectionAdapterStatus;
   install(): InjectionAdapterInstallResult;
+  uninstall(): InjectionAdapterUninstallResult;
 }
