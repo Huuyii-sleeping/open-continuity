@@ -11,7 +11,9 @@ describe("adapter setup compensation transaction", () => {
   afterEach(() => { for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true }); });
 
   function parseError(stderr: string) {
-    return JSON.parse(stderr.trim().split("\n").at(-1)!);
+    const line = stderr.split("\n").find((candidate) => candidate.trimStart().startsWith("{"));
+    if (!line) throw new Error(`CLI error output did not contain JSON: ${stderr}`);
+    return JSON.parse(line);
   }
 
   it("removes a newly connected Claude MCP when hook validation fails", () => {
