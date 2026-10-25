@@ -9,7 +9,9 @@ const service = new MemoryService(runtime.store, runtime.profile.retrieval, runt
 const policy = accessPolicyFromEnv();
 
 if (process.argv.includes("--mcp")) {
-  process.stdin.once("end", () => { void service.close(); });
+  process.stdin.once("end", () => { void service.closeGracefully().catch(() => {
+    console.error("OpenContinuity shutdown did not complete within its drain budget."); process.exitCode = 1;
+  }); });
   await startMcpStdio(service, policy, runtime.capabilities, {
     userId: process.env.OPEN_CONTINUITY_USER_ID || undefined,
     agentId: process.env.OPEN_CONTINUITY_AGENT_ID || undefined,
@@ -18,7 +20,9 @@ if (process.argv.includes("--mcp")) {
   const host = process.env.HOST ?? "127.0.0.1";
   const port = Number(process.env.PORT ?? 8787);
   const app = buildHttpApp(service, policy, runtime.capabilities);
-  const shutdown = async () => { await app.close(); };
+  const shutdown = async () => { try { await app.close(); } catch {
+    console.error("OpenContinuity shutdown failed; pending operations were not force-closed."); process.exitCode = 1;
+  } };
   process.once("SIGINT", () => { void shutdown(); });
   process.once("SIGTERM", () => { void shutdown(); });
   await app.listen({ host, port });

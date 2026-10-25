@@ -1,22 +1,9 @@
 import { OpenContinuityError } from "../shared/errors.js";
-import type { ContextPackItem, ContextPackOmission, ContextPackResult, ContextPurpose, ParsedContextPackInput, ResolvedMemory, ContextSelectionReason } from "../shared/types.js";
+import type { ContextCoverageRequirement, ContextPackItem, ContextPackOmission, ContextPackResult, ParsedContextPackInput, ResolvedMemory } from "../shared/types.js";
 import type { RetrievalPipeline } from "./retrieval.js";
-
-export interface ContextPackPolicy {
-  defaultTokenBudget: number;
-  maxTokenBudget: number;
-  maxMemories: number;
-  requireUserConfirmed?: boolean;
-}
-
-interface RankedContextMemory { memory: ResolvedMemory; priority: number; reasons: ContextSelectionReason[]; }
-
-const PURPOSE_KIND_WEIGHT: Record<ContextPurpose, Partial<Record<ResolvedMemory["kind"], number>>> = {
-  general: { user_preference: 8, user_fact: 6, task_state: 7, decision: 7 },
-  coding: { task_state: 12, decision: 10, user_preference: 8, user_fact: 5 },
-  research: { decision: 12, user_fact: 10, task_state: 7, user_preference: 5 },
-  browser: { user_preference: 12, task_state: 10, user_fact: 6, decision: 5 },
-};
+import { resolveContextPackPolicy, selectContextCandidates, type ContextPackPolicy, type ResolvedContextPackPolicy } from "./context-selection.js";
+export type { ContextPackPolicy } from "./context-selection.js";
+import { contextCoverage, uniqueContextMemories, validateCoverageRequirements } from "./context-coverage.js";
 
 export function estimateContextTokens(text: string): number {
   return text.length === 0 ? 0 : Math.max(1, Math.ceil(Buffer.byteLength(text, "utf8") / 4));
@@ -27,12 +14,13 @@ function renderMemory(memory: ResolvedMemory): string {
     ...(memory.fact ? { fact: { group: memory.fact.group, validFrom: memory.fact.validFrom, validUntil: memory.fact.validUntil, status: memory.retrieval?.factAssessment?.status ?? "unresolved" } } : {}) });
 }
 
-function compareContextMemory(left: RankedContextMemory, right: RankedContextMemory): number {
-  return right.priority - left.priority || right.memory.updatedAt.localeCompare(left.memory.updatedAt) || right.memory.id.localeCompare(left.memory.id);
-}
-
 export class ContextPackBuilder {
-  constructor(private readonly retrieval: RetrievalPipeline, private readonly policy: ContextPackPolicy) {}
+  private readonly policy: Readonly<ResolvedContextPackPolicy>;
+  constructor(private readonly retrieval: RetrievalPipeline, policy: ContextPackPolicy) {
+    this.policy = resolveContextPackPolicy(policy);
+  }
+
+  capabilityPolicy() { return { ...this.policy }; }
 
   async build(input: ParsedContextPackInput): Promise<ContextPackResult> {
     const recall = await this.retrieval.recall({
@@ -42,35 +30,39 @@ export class ContextPackBuilder {
     return this.buildFromMemories(input, recall.memories, recall.retrieval);
   }
 
-  buildFromMemories(input: ParsedContextPackInput, memories: ResolvedMemory[], retrieval?: ContextPackResult["retrieval"]): ContextPackResult {
+  buildFromMemories(input: ParsedContextPackInput, memories: ResolvedMemory[], retrieval?: ContextPackResult["retrieval"], requirements?: ContextCoverageRequirement[]): ContextPackResult {
     const requestedTokens = input.tokenBudget ?? this.policy.defaultTokenBudget;
     if (requestedTokens > this.policy.maxTokenBudget) {
       throw new OpenContinuityError("VALIDATION_ERROR", "tokenBudget exceeds the active profile limit", 400, { requestedTokens, maxTokenBudget: this.policy.maxTokenBudget });
     }
     const maxMemories = Math.min(input.maxMemories ?? this.policy.maxMemories, this.policy.maxMemories);
-    const visibleMemories = this.policy.requireUserConfirmed ? memories.filter((memory) => memory.userConfirmed) : memories;
-    const ranked = visibleMemories.map((memory) => this.rank(memory, input)).sort(compareContextMemory);
+    const unique = uniqueContextMemories(memories);
+    const obligations = requirements ?? [{ id: "context-query", query: input.query, memoryIds: unique.memories.map(memory => memory.id) }];
+    validateCoverageRequirements(obligations, unique.memories);
+    const { ranked, receipt } = selectContextCandidates(input, unique.memories, this.policy);
     const items: ContextPackItem[] = [];
     const omitted: ContextPackOmission[] = [];
     const lines: string[] = [];
     let usedTokens = 0;
 
-    for (const candidate of ranked) {
+    const accepted = new Set<string>();
+    const rejected = new Set<string>();
+    const append = (candidate: typeof ranked[number]) => {
       const line = renderMemory(candidate.memory);
       const estimatedTokens = estimateContextTokens(line);
       if (candidate.memory.fact && !candidate.memory.retrieval?.factAssessment?.usable) {
         omitted.push({ memoryId: candidate.memory.id, key: candidate.memory.key, estimatedTokens, reason: "fact_unresolved" });
-        continue;
+        rejected.add(candidate.memory.id); return false;
       }
       if (items.length >= maxMemories) {
         omitted.push({ memoryId: candidate.memory.id, key: candidate.memory.key, estimatedTokens, reason: "max_memories" });
-        continue;
+        rejected.add(candidate.memory.id); return false;
       }
       const nextContext = lines.length === 0 ? line : lines.join("\n") + "\n" + line;
       const nextUsedTokens = estimateContextTokens(nextContext);
       if (nextUsedTokens > requestedTokens) {
         omitted.push({ memoryId: candidate.memory.id, key: candidate.memory.key, estimatedTokens, reason: "token_budget" });
-        continue;
+        rejected.add(candidate.memory.id); return false;
       }
       lines.push(line);
       usedTokens = nextUsedTokens;
@@ -81,27 +73,33 @@ export class ContextPackBuilder {
         version: candidate.memory.version, supersedes: candidate.memory.supersedes, confidence: candidate.memory.confidence,
         retrieval: candidate.memory.retrieval,
         fact: candidate.memory.fact,
+        selection: candidate.selection,
       });
+      accepted.add(candidate.memory.id); return true;
+    };
+    const packing = requirements ? this.policy.queryPacking : "rank_only";
+    // Greedy maximum uncovered-query gain; stable rank breaks ties. Query has <=32 obligations and <=800 candidates.
+    if (packing === "query_coverage") {
+      const uncovered = new Set(obligations.map(requirement => requirement.id));
+      while (uncovered.size && items.length < maxMemories) {
+        const gain = (id: string) => obligations.filter(requirement => uncovered.has(requirement.id) && requirement.memoryIds.includes(id)).length;
+        const remaining = ranked.filter(candidate => !accepted.has(candidate.memory.id) && !rejected.has(candidate.memory.id) && gain(candidate.memory.id) > 0);
+        remaining.sort((a, b) => gain(b.memory.id) - gain(a.memory.id));
+        const candidate = remaining[0];
+        if (!candidate) break;
+        if (append(candidate)) for (const requirement of obligations) if (requirement.memoryIds.includes(candidate.memory.id)) uncovered.delete(requirement.id);
+      }
     }
+    for (const candidate of ranked) if (!accepted.has(candidate.memory.id) && !rejected.has(candidate.memory.id)) append(candidate);
 
-    return {
+    return structuredClone({
       context: lines.join("\n"), items, omitted,
       budget: { requestedTokens, usedTokens, remainingTokens: requestedTokens - usedTokens, maxMemories, estimation: "utf8_bytes_v1" },
       retrieval,
-    };
+      selection: receipt,
+      coverage: contextCoverage(obligations, accepted, omitted, packing, unique.duplicatesRemoved,
+        new Set(unique.memories.filter(memory => this.policy.requireUserConfirmed && !memory.userConfirmed).map(memory => memory.id))),
+    });
   }
 
-  private rank(memory: ResolvedMemory, input: ParsedContextPackInput): RankedContextMemory {
-    const reasons: ContextSelectionReason[] = [];
-    let priority = (memory.retrieval?.score ?? 0) * 1000;
-    for (const channel of memory.retrieval?.channels ?? []) {
-      reasons.push(channel === "exact" ? "retrieval_exact" : channel === "structured" ? "retrieval_structured" : "retrieval_full_text");
-    }
-    if (memory.scope === "task" && memory.taskId === input.taskId) { priority += 20; reasons.push("task_scope"); }
-    if (memory.scope === "agent" && memory.ownerAgentId === input.agentId) { priority += 15; reasons.push("agent_scope"); }
-    if (memory.userConfirmed) { priority += 10; reasons.push("user_confirmed"); }
-    priority += PURPOSE_KIND_WEIGHT[input.purpose][memory.kind] ?? 0;
-    reasons.push(`purpose_${input.purpose}`);
-    return { memory, priority: Number(priority.toFixed(6)), reasons };
-  }
 }

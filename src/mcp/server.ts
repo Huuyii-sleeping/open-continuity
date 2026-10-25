@@ -90,7 +90,7 @@ export function createMcpServer(service = new MemoryService(), policy = new Acce
   });
 
   server.registerTool("memory_query", {
-    description: "Run a bounded, auditable retrieval plan with optional subqueries and memory history, then return evidence sufficiency, fallback reasons, and a context pack.",
+    description: "Run bounded retrieval and return a coverage-aware context pack, budgeted evidence sufficiency, and verbatim memory statements with exact-version citations. Evidence-ready means query-match coverage, not semantic truth or a generated answer. History is audit metadata, not a synthesized timeline; missing evidence produces partial or abstain results.",
     inputSchema: {
       ...identitySchema, query: z.string().min(1), key: z.string().min(1).optional(),
       kind: z.enum(["user_preference", "user_fact", "task_state", "decision"]).optional(),

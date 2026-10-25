@@ -106,7 +106,9 @@ export class PostgresMemoryStore implements MemoryStore, MemoryRepository, Candi
   }
 
   static fromConnectionString(connectionString: string, options: Omit<PostgresMemoryStoreOptions, "ownsPool"> = {}): PostgresMemoryStore {
-    return new PostgresMemoryStore(new Pool({ connectionString }), { ...options, ownsPool: true });
+    // Bound pool acquisition and server-side waits; these are not per-request cancellation.
+    return new PostgresMemoryStore(new Pool({ connectionString, max: 10, connectionTimeoutMillis: 2000,
+      statement_timeout: 5000, lock_timeout: 2000 }), { ...options, ownsPool: true });
   }
 
   async initialize(): Promise<void> {

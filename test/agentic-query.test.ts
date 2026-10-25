@@ -33,7 +33,9 @@ describe("AgenticQueryEngine", () => {
     expect(result.steps.map((step) => [step.type, step.status])).toEqual([["recall", "completed"], ["recall", "completed"], ["history", "completed"]]);
     expect(result.evidence.map((item) => item.memory.key).sort()).toEqual(["language", "testing"]);
     expect(result.evidence.find((item) => item.memory.id === first.current.id)?.history).toMatchObject({ eventCount: 2, versions: [1, 2] });
-    expect(result.sufficiency).toMatchObject({ status: "sufficient", matchedQueries: 2, totalQueries: 2, evidenceCount: 2 });
+    expect(result.retrievalSufficiency).toMatchObject({ status: "sufficient", matchedQueries: 2, totalQueries: 2, evidenceCount: 2 });
+    expect(result.sufficiency).toMatchObject({ status: "partial", matchedQueries: 2, totalQueries: 2, evidenceCount: 2, reasons: expect.arrayContaining(["history_not_projected"]) });
+    expect(result.answer).toMatchObject({ status: "partial", limitations: expect.arrayContaining(["history_not_projected"]) });
     expect(result.contextPack.items).toHaveLength(2);
     expect(result.execution).toMatchObject({ maxSteps: 3, completedSteps: 3, stoppedReason: "completed" });
   });
@@ -141,5 +143,12 @@ describe("AgenticQueryEngine", () => {
     expect(result.plan.steps).toHaveLength(1);
     expect(result.plan.steps[0]?.type).toBe("recall");
     expect(result.evidence[0]?.history).toBeUndefined();
+  });
+  it("rejects unbounded automatic obligations and marks candidate truncation as partial", async () => {
+    const service = new MemoryService(new InMemoryStore(), { candidateLimit: 1 });
+    await expect(service.query({ userId: "fictional-user", agentId: "fictional-agent", query: Array(33).fill("needle").map((value, index) => `${value}${index}`).join(" and ") })).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    for (const key of ["one", "two"]) await service.remember({ userId: "fictional-user", agentId: "fictional-agent", key, value: "needle", kind: "decision", idempotencyKey: `fictional-${key}` });
+    const result = await service.query({ userId: "fictional-user", agentId: "fictional-agent", query: "needle" });
+    expect(result.answer).toMatchObject({ status: "partial", reasons: expect.arrayContaining(["candidate_limit"]) });
   });
 });

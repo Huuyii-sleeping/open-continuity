@@ -3,8 +3,8 @@ import { estimateContextTokens } from "../src/core/context-pack.js";
 import { MemoryService } from "../src/core/memory-service.js";
 
 describe("ContextPackBuilder", () => {
-  it("prioritizes task context for coding and explains every selection", async () => {
-    const service = new MemoryService();
+  it("preserves explicit legacy task weighting and explains every selection", async () => {
+    const service = new MemoryService(undefined, {}, { defaultTokenBudget: 1024, maxTokenBudget: 4096, maxMemories: 20, selectionMode: "legacy_weighted" });
     await service.remember({ userId: "u1", agentId: "codex", key: "response_style", value: "project answers should be concise", kind: "user_preference", userConfirmed: true, idempotencyKey: "context-rank-1" });
     await service.remember({ userId: "u1", agentId: "codex", key: "build_state", value: "project build is failing", kind: "task_state", scope: "task", taskId: "t1", idempotencyKey: "context-rank-2" });
     await service.remember({ userId: "u1", agentId: "codex", key: "architecture", value: "project uses TypeScript", kind: "decision", idempotencyKey: "context-rank-3" });

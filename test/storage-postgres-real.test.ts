@@ -6,6 +6,8 @@ import { PostgresMemoryStore, type DatabasePool } from "../src/postgres/postgres
 import { storageConformance } from "./helpers/storage-conformance.js";
 import { candidateConformance } from "./helpers/candidate-conformance.js";
 import { factConformance } from "./helpers/fact-conformance.js";
+import { contextSelectionConformance } from "./helpers/context-selection-conformance.js";
+import { answerConformance } from "./helpers/answer-conformance.js";
 
 // Explicit opt-in only: never use DATABASE_URL, PG* defaults or the user's service database.
 const connection = process.env.OPEN_CONTINUITY_TEST_POSTGRES_URL;
@@ -51,10 +53,45 @@ async function runtime() {
 describe.skipIf(!connection)("real PostgreSQL disposable storage evidence", () => {
   storageConformance("postgres-real", runtime);
   candidateConformance("postgres-real", runtime);
+  contextSelectionConformance("postgres-real", runtime);
+  answerConformance("postgres-real", runtime);
   factConformance("postgres-real", runtime);
 
   const query = { userId: "fictional-pg-concurrent", agentId: "fictional-reader" };
   const input = { userId: query.userId, agentId: "fictional-writer", key: "fictional-shared", value: { seeded: true }, kind: "user_fact" as const, idempotencyKey: "fictional-initial" };
+  it("5A retains capacity for timed-out native reads and resumes only after settlement", async () => {
+    const rt = await runtime(); await rt.service.remember(input);
+    let delayed = true;
+    const slow = new PostgresMemoryStore({ connect: async () => {
+      const client = await rt.pool.connect();
+      return { release: destroy => client.release(destroy), query: async (text, values) => {
+        if (delayed && text.startsWith("SELECT * FROM memories_current")) {
+          delayed = false; await client.query("SELECT pg_sleep(0.15)");
+        }
+        return client.query(text, values);
+      } };
+    } }, { autoMigrate: false });
+    await slow.initialize();
+    const service = new MemoryService(slow, {}, undefined, undefined, { defaultTimeoutMs: 10, maxPendingReads: 1 });
+    await expect(service.recall(query)).rejects.toMatchObject({ code: "READ_TIMEOUT" });
+    expect(service.readRuntimeStatus().pendingReads).toBe(1);
+    await expect(service.recall(query)).rejects.toMatchObject({ code: "RUNTIME_BUSY" });
+    // Bounded polling of this one synthetic operation, not a production retry mechanism.
+    for (let n = 0; n < 100 && service.readRuntimeStatus().pendingReads; n++) await new Promise(resolve => setTimeout(resolve, 10));
+    expect(service.readRuntimeStatus().pendingReads).toBe(0);
+    expect((await service.recall(query)).memories).toHaveLength(1); await service.close();
+  });
+  it("5A server statement timeout errors remain explicit and a clean connection can recover", async () => {
+    const rt = await runtime();
+    const client = await rt.pool.connect();
+    try {
+      await client.query("SET statement_timeout = 30");
+      await expect(client.query("SELECT pg_sleep(0.15)")).rejects.toMatchObject({ code: "57014" });
+      await client.query("SET statement_timeout = 3000");
+    } finally { client.release(); }
+    await rt.service.remember(input);
+    expect((await rt.service.query({ ...query, query: "fictional-shared" })).answer?.status).toBe("evidence_ready");
+  });
   it("serializes concurrent merge and records the materialized audit/version chain", async () => {
     const { service } = await runtime();
     await service.remember(input);

@@ -28,6 +28,26 @@ describe("MCP server", () => {
     expect(JSON.parse(text ?? "{}")).toMatchObject({ memory: { evolution: { factDeclarations: false } }, retrieval: {
       rankingVersion: null, fullTextRanking: "unverified", structuredContribution: null, exactPrecedence: null, factPolicy: null, factGroupLimit: 0 } });
   });
+  it("exposes active context selection policy and includes selection receipts", async () => {
+    const service = new MemoryService(new InMemoryStore(), {}, { defaultTokenBudget: 128, maxTokenBudget: 256, maxMemories: 2, selectionMode: "relevance_only", requireUserConfirmed: true });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "fictional-context-agent", version: "0.1.0" });
+    const server = createMcpServer(service, new AccessPolicy(), undefined, { userId: "fictional-context-user", agentId: "fictional-context-agent" });
+    connections.push({ client, server }); await server.connect(serverTransport); await client.connect(clientTransport);
+    const capabilities = await client.callTool({ name: "memory_capabilities", arguments: {} });
+    expect(capabilities.isError).not.toBe(true);
+    const capabilityText = (capabilities.content as Array<{ type: string; text?: string }>).find(item => item.type === "text")?.text;
+    expect(JSON.parse(capabilityText ?? "{}").contextPack).toMatchObject({ selectionVersion: "context-selection-v2", selectionMode: "relevance_only",
+      requireUserConfirmed: true, purposePreference: "disabled", defaultTokenBudget: 128, maxTokenBudget: 256, maxMemories: 2, scopeBoostMax: 0, confirmationBoost: 0 });
+    const context = await client.callTool({ name: "memory_context", arguments: { query: "absent" } });
+    expect(context.isError).not.toBe(true);
+    const contextText = (context.content as Array<{ type: string; text?: string }>).find(item => item.type === "text")?.text;
+    expect(JSON.parse(contextText ?? "{}").selection).toMatchObject({ version: "context-selection-v2", mode: "relevance_only" });
+    const query = await client.callTool({ name: "memory_query", arguments: { query: "absent" } });
+    expect(query.isError).not.toBe(true);
+    const queryText = (query.content as Array<{ type: string; text?: string }>).find(item => item.type === "text")?.text;
+    expect(JSON.parse(queryText ?? "{}")).toMatchObject({ sufficiencyVersion: "budgeted-context-v1", sufficiency: { status: "insufficient" }, answer: { mode: "memory_projection", status: "abstain", statements: [], citations: [] } });
+  });
   it("advertises and transports explicit facts without bypassing confirmation", async () => {
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "fictional-fact-agent", version: "0.1.0" }), server = createMcpServer();

@@ -4,19 +4,35 @@ import type { AgenticEvidence, AgenticQueryPlanStep, AgenticQueryResult, Agentic
 import { ContextPackBuilder, type ContextPackPolicy } from "./context-pack.js";
 import type { MemoryStore } from "./memory-store.js";
 import type { RetrievalPipeline } from "./retrieval.js";
+import type { ResolvedContextPackPolicy } from "./context-selection.js";
+import { composeEvidenceAnswer } from "./evidence-answer.js";
+import { contextCoverage } from "./context-coverage.js";
+import { memoryProjection } from "./context-coverage.js";
+import { isDeepStrictEqual } from "node:util";
+import { performance } from "node:perf_hooks";
+import { ReadDeadline, ReadTimeoutError } from "./read-runtime.js";
+import { z } from "zod";
 
 export interface AgenticQueryPolicy {
   defaultMaxSteps: number; maxSteps: number; defaultTimeoutMs: number; maxTimeoutMs: number; maxSubqueries: number; historyLimit: number;
 }
+export function resolveAgenticQueryPolicy(input: AgenticQueryPolicy): Readonly<AgenticQueryPolicy> {
+  const parsed = z.object({
+    defaultMaxSteps: z.number().int().min(1).max(8), maxSteps: z.number().int().min(1).max(8),
+    defaultTimeoutMs: z.number().int().min(10).max(30000), maxTimeoutMs: z.number().int().min(10).max(30000),
+    maxSubqueries: z.number().int().min(1).max(8), historyLimit: z.number().int().min(1).max(100),
+  }).strict().refine(policy => policy.defaultMaxSteps <= policy.maxSteps && policy.defaultTimeoutMs <= policy.maxTimeoutMs).safeParse(input);
+  if (!parsed.success) throw new OpenContinuityError("VALIDATION_ERROR", "Invalid query policy", 400);
+  return Object.freeze(parsed.data);
+}
 
 interface PlannedQuery {
   id: string; complexity: QueryComplexity; strategy: "direct" | "multi_step"; rationale: string[]; queries: string[];
-  steps: AgenticQueryPlanStep[]; totalQueries: number; historyRequested: boolean; unsupportedComplexity: boolean; subqueryLimitApplied: boolean;
+  steps: AgenticQueryPlanStep[]; requestedQueries: string[]; totalQueries: number; historyRequested: boolean; unsupportedComplexity: boolean; subqueryLimitApplied: boolean;
 }
 
 interface EvidenceAccumulator { memory: ResolvedMemory; matchedQueries: Set<string>; stepIds: Set<string>; score: number; }
 interface HistoryExpansion { events: MemoryEvent[]; truncatedMemoryIds: Set<string>; truncated: boolean; }
-class StepTimeoutError extends Error {}
 
 const HISTORY_SIGNAL = /(?:history|historical|change|changed|evolution|previous|before|timeline|why|历史|变化|演化|之前|原因|决策过程)/i;
 const MULTI_HOP_SIGNAL = /(?:relationship|related across|across projects|root cause|multi[- ]?hop|关系|跨项目|根因|多跳)/i;
@@ -49,12 +65,15 @@ function combineRetrieval(left: ResolvedMemory["retrieval"], right: ResolvedMemo
 
 export class AgenticQueryEngine {
   private readonly contextPack: ContextPackBuilder;
+  private readonly contextPackPolicy: Readonly<ResolvedContextPackPolicy>;
 
-  constructor(private readonly store: MemoryStore, private readonly retrieval: RetrievalPipeline, private readonly contextPackPolicy: ContextPackPolicy, private readonly policy: AgenticQueryPolicy) {
+  constructor(private readonly store: MemoryStore, private readonly retrieval: RetrievalPipeline, contextPackPolicy: ContextPackPolicy, private readonly policy: AgenticQueryPolicy) {
+    this.policy = resolveAgenticQueryPolicy(policy);
     this.contextPack = new ContextPackBuilder(retrieval, contextPackPolicy);
+    this.contextPackPolicy = Object.freeze(this.contextPack.capabilityPolicy());
   }
 
-  async query(input: ParsedAgenticQueryInput): Promise<AgenticQueryResult> {
+  async query(input: ParsedAgenticQueryInput, executionBudget?: ReadDeadline): Promise<AgenticQueryResult> {
     const maxSteps = input.maxSteps ?? this.policy.defaultMaxSteps;
     const timeoutMs = input.timeoutMs ?? this.policy.defaultTimeoutMs;
     if (maxSteps > this.policy.maxSteps) throw new OpenContinuityError("VALIDATION_ERROR", "maxSteps exceeds the active profile limit", 400, { maxSteps, profileMaxSteps: this.policy.maxSteps });
@@ -62,14 +81,15 @@ export class AgenticQueryEngine {
     if (input.subqueries && input.subqueries.length > this.policy.maxSubqueries) throw new OpenContinuityError("VALIDATION_ERROR", "subqueries exceed the active profile limit", 400, { subqueries: input.subqueries.length, profileMaxSubqueries: this.policy.maxSubqueries });
 
     const plan = this.plan(input);
-    const startedAt = Date.now();
-    const deadline = startedAt + timeoutMs;
+    const startedAt = performance.now();
+    const budget = executionBudget ?? new ReadDeadline(timeoutMs);
     const steps: AgenticQueryStepReceipt[] = [];
     const evidenceById = new Map<string, EvidenceAccumulator>();
     let historyEvents: MemoryEvent[] = [];
     let historyTruncatedMemoryIds = new Set<string>();
     let historyTruncated = false;
     let stoppedReason: AgenticQueryResult["execution"]["stoppedReason"] = "completed";
+    let candidateTruncated = false;
 
     for (const step of plan.steps) {
       if (steps.filter((item) => item.status !== "skipped").length >= maxSteps) {
@@ -77,22 +97,23 @@ export class AgenticQueryEngine {
         if (stoppedReason !== "timeout") stoppedReason = "max_steps";
         continue;
       }
-      if (Date.now() >= deadline) {
+      if (budget.expired()) {
         steps.push({ ...step, status: "skipped", candidateCount: 0, durationMs: 0, detail: "timeout" });
         stoppedReason = "timeout";
         continue;
       }
 
-      const stepStartedAt = Date.now();
+      const stepStartedAt = performance.now();
       try {
         if (step.type === "recall") {
-          const recall = await this.withDeadline(this.retrieval.recall({
+          const recall = await budget.wait(() => this.retrieval.recall({
             userId: input.userId, agentId: input.agentId, query: step.query!, key: input.key, kind: input.kind, scope: input.scope, taskId: input.taskId,
             includePrivate: input.includePrivate, limit: 100, cursor: undefined,
-          }, { requireUserConfirmed: this.contextPackPolicy.requireUserConfirmed }), deadline);
+          }, { requireUserConfirmed: this.contextPackPolicy.requireUserConfirmed }));
+          candidateTruncated ||= recall.retrieval?.truncated ?? false;
           recall.memories.forEach((memory, index) => {
             const current = evidenceById.get(memory.id) ?? { memory, matchedQueries: new Set<string>(), stepIds: new Set<string>(), score: 0 };
-            if (current.memory.sourceEventId !== memory.sourceEventId || current.memory.version !== memory.version) {
+            if (!isDeepStrictEqual(memoryProjection(current.memory), memoryProjection(memory))) {
               throw new OpenContinuityError("STORAGE_ERROR", "Inconsistent query evidence versions", 500);
             }
             const previousRetrieval = current.score === 0 ? undefined : current.memory.retrieval;
@@ -100,20 +121,20 @@ export class AgenticQueryEngine {
             current.memory = { ...current.memory, ...memory, retrieval: combineRetrieval(previousRetrieval, memory.retrieval, current.score, step.query!, step.id) };
             current.matchedQueries.add(step.query!); current.stepIds.add(step.id); evidenceById.set(memory.id, current);
           });
-          steps.push({ ...step, status: "completed", candidateCount: recall.memories.length, durationMs: Date.now() - stepStartedAt,
+          steps.push({ ...step, status: "completed", candidateCount: recall.memories.length, durationMs: performance.now() - stepStartedAt,
             ...(recall.retrieval?.factReview ? { factReview: recall.retrieval.factReview } : {}) });
         } else if (evidenceById.size === 0) {
-          steps.push({ ...step, status: "skipped", candidateCount: 0, durationMs: Date.now() - stepStartedAt, detail: "no_candidates" });
+          steps.push({ ...step, status: "skipped", candidateCount: 0, durationMs: performance.now() - stepStartedAt, detail: "no_candidates" });
         } else {
-          const history = await this.withDeadline(this.loadHistory(input, evidenceById), deadline);
+          const history = await budget.wait(() => this.loadHistory(input, evidenceById));
           historyEvents = history.events;
           historyTruncatedMemoryIds = history.truncatedMemoryIds;
           historyTruncated = history.truncated;
-          steps.push({ ...step, status: "completed", candidateCount: historyEvents.length, durationMs: Date.now() - stepStartedAt, ...(history.truncated ? { detail: "history_limit" } : {}) });
+          steps.push({ ...step, status: "completed", candidateCount: historyEvents.length, durationMs: performance.now() - stepStartedAt, ...(history.truncated ? { detail: "history_limit" } : {}) });
         }
       } catch (error) {
-        if (!(error instanceof StepTimeoutError)) throw error;
-        steps.push({ ...step, status: "timed_out", candidateCount: 0, durationMs: Date.now() - stepStartedAt, detail: "timeout" });
+        if (!(error instanceof ReadTimeoutError)) throw error;
+        steps.push({ ...step, status: "timed_out", candidateCount: 0, durationMs: performance.now() - stepStartedAt, detail: "timeout" });
         stoppedReason = "timeout";
       }
     }
@@ -121,9 +142,8 @@ export class AgenticQueryEngine {
     let factReview: AgenticQueryResult["factReview"];
     if ([...evidenceById.values()].some(item => item.memory.fact)) {
       try {
-        if (Date.now() >= deadline) throw new StepTimeoutError();
-        const checked = await this.withDeadline(this.retrieval.reviewFacts({ ...input, limit: 100, cursor: undefined },
-          [...evidenceById.values()].map(item => item.memory), this.contextPackPolicy.requireUserConfirmed), deadline);
+        const checked = await budget.wait(() => this.retrieval.reviewFacts({ ...input, limit: 100, cursor: undefined },
+          [...evidenceById.values()].map(item => item.memory), this.contextPackPolicy.requireUserConfirmed));
         factReview = checked.review;
         const accepted = new Map(checked.ranked.map(item => [item.memory.id, item.retrieval]));
         for (const [id, item] of evidenceById) {
@@ -131,7 +151,7 @@ export class AgenticQueryEngine {
           else item.memory = { ...item.memory, retrieval: accepted.get(id) };
         }
       } catch (error) {
-        if (!(error instanceof StepTimeoutError)) throw error;
+        if (!(error instanceof ReadTimeoutError)) throw error;
         // Never inject stale fact assessments when final validation runs out of budget.
         for (const [id, item] of evidenceById) if (item.memory.fact) evidenceById.delete(id);
         stoppedReason = "timeout";
@@ -139,9 +159,37 @@ export class AgenticQueryEngine {
     }
     const evidence = this.materializeEvidence(evidenceById, historyEvents, plan.historyRequested, historyTruncatedMemoryIds);
     const syntheticMemories = evidence.map((item) => ({ ...item.memory, retrieval: { ...(item.memory.retrieval ?? { channels: [], ranks: {} }), score: item.score } }));
-    const contextPack = this.contextPack.buildFromMemories(input, syntheticMemories);
+    const obligations = plan.requestedQueries.map((query, index) => ({ id: `query-${index + 1}`, query,
+      memoryIds: evidence.filter(item => item.matchedQueries.includes(query)).map(item => item.memory.id) }));
+    let contextPack = this.contextPack.buildFromMemories(input, syntheticMemories, undefined, obligations);
+    if (budget.expired()) {
+      stoppedReason = "timeout";
+      const empty = this.contextPack.buildFromMemories(input, []);
+      contextPack = { ...empty, coverage: contextCoverage(obligations, new Set(), contextPack.omitted, this.contextPackPolicy.queryPacking, 0) };
+      contextPack.coverage!.requirements = contextPack.coverage!.requirements.map(row => ({ ...row, reason: "execution_timeout" }));
+    }
     const matchedQueries = new Set(evidence.flatMap((item) => item.matchedQueries)).size;
-    const sufficiency = this.sufficiency(input, plan, evidence, matchedQueries, stoppedReason, historyEvents.length, historyTruncated);
+    const retrievalSufficiency = this.sufficiency(input, plan, evidence, matchedQueries, stoppedReason, historyEvents.length, historyTruncated);
+    const packedIds = new Set(contextPack.items.map(item => item.memoryId));
+    const packed = evidence.filter(item => packedIds.has(item.memory.id));
+    let sufficiency = this.sufficiency(input, plan, packed, contextPack.coverage!.coveredQueries, stoppedReason, 0, historyTruncated);
+    if (evidence.length && !packed.length) sufficiency.reasons.push("empty_context");
+    if (packed.length < evidence.length) sufficiency.reasons.push("context_budget");
+    if (plan.historyRequested) sufficiency.reasons.push("history_not_projected");
+    if (plan.subqueryLimitApplied) sufficiency.reasons.push("subquery_limit");
+    if (candidateTruncated) sufficiency.reasons.push("candidate_limit");
+    if (steps.some(step => step.factReview?.omitted.some(item => item.assessment.status === "conflict"))) sufficiency.reasons.push("fact_conflict");
+    if (sufficiency.status === "sufficient" && candidateTruncated) sufficiency.status = "partial";
+    let answer = composeEvidenceAnswer(contextPack, evidence, sufficiency, plan.historyRequested);
+    // Rendering/hashing is synchronous too; never publish an answer completed after the budget.
+    if (budget.expired()) {
+      stoppedReason = "timeout";
+      contextPack = this.contextPack.buildFromMemories(input, []);
+      contextPack.coverage = contextCoverage(obligations, new Set(), [], this.contextPackPolicy.queryPacking, 0);
+      contextPack.coverage.requirements = contextPack.coverage.requirements.map(row => ({ ...row, reason: "execution_timeout" }));
+      sufficiency = this.sufficiency(input, plan, [], 0, "timeout", 0, historyTruncated);
+      answer = composeEvidenceAnswer(contextPack, evidence, sufficiency, plan.historyRequested);
+    }
     const fallbackReasons: AgenticQueryResult["fallback"]["reasons"] = [];
     if (plan.unsupportedComplexity) fallbackReasons.push("unsupported_complexity");
     if (plan.subqueryLimitApplied) fallbackReasons.push("subquery_limit");
@@ -152,8 +200,9 @@ export class AgenticQueryEngine {
 
     return {
       plan: { id: plan.id, complexity: plan.complexity, strategy: plan.strategy, rationale: plan.rationale, steps: plan.steps }, steps, evidence, contextPack, sufficiency,
+      retrievalSufficiency, sufficiencyVersion: "budgeted-context-v1", answer,
       ...(factReview ? { factReview } : {}),
-      execution: { maxSteps, completedSteps: steps.filter((step) => step.status === "completed").length, timeoutMs, elapsedMs: Date.now() - startedAt, stoppedReason },
+      execution: { maxSteps, completedSteps: steps.filter((step) => step.status === "completed").length, timeoutMs, elapsedMs: performance.now() - startedAt, stoppedReason },
       fallback: { used: fallbackReasons.length > 0, reasons: [...new Set(fallbackReasons)], mode: "deterministic" },
     };
   }
@@ -161,6 +210,7 @@ export class AgenticQueryEngine {
   private plan(input: ParsedAgenticQueryInput): PlannedQuery {
     const split = unique((input.subqueries ?? (input.key ? [input.key] : input.query.split(SPLIT_PATTERN))).map(stripPlanningWords));
     const requestedQueries = input.strategy === "direct" ? [split[0] ?? input.query] : split;
+    if (requestedQueries.length > 32) throw new OpenContinuityError("VALIDATION_ERROR", "Query plan exceeds the bounded obligation limit", 400);
     const queries = requestedQueries.slice(0, this.policy.maxSubqueries);
     const subqueryLimitApplied = requestedQueries.length > queries.length;
     const requestedHistory = input.includeHistory || HISTORY_SIGNAL.test(input.query);
@@ -176,7 +226,7 @@ export class AgenticQueryEngine {
     if (unsupportedComplexity) rationale.push("graph_or_semantic_reasoning_unavailable");
     const steps: AgenticQueryPlanStep[] = queries.map((query, index) => ({ id: `recall-${index + 1}`, type: "recall", query, reason: index === 0 ? "primary_query" : "subquery_coverage" }));
     if (strategy === "multi_step" && historySignal) steps.push({ id: "history-1", type: "history", reason: "evolution_evidence" });
-    return { id: planId(input, queries), complexity, strategy, rationale, queries, steps, totalQueries: requestedQueries.length, historyRequested: strategy === "multi_step" && historySignal, unsupportedComplexity, subqueryLimitApplied };
+    return { id: planId(input, queries), complexity, strategy, rationale, queries, steps, requestedQueries, totalQueries: requestedQueries.length, historyRequested: strategy === "multi_step" && historySignal, unsupportedComplexity, subqueryLimitApplied };
   }
 
   private materializeEvidence(accumulators: Map<string, EvidenceAccumulator>, events: MemoryEvent[], historyRequested: boolean, truncatedMemoryIds: Set<string>): AgenticEvidence[] {
@@ -216,14 +266,4 @@ export class AgenticQueryEngine {
     return { events, truncatedMemoryIds, truncated: truncatedMemoryIds.size > 0 };
   }
 
-  private async withDeadline<T>(operation: Promise<T>, deadline: number): Promise<T> {
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) throw new StepTimeoutError();
-    let timer: NodeJS.Timeout | undefined;
-    try {
-      return await Promise.race([operation, new Promise<T>((_resolve, reject) => { timer = setTimeout(() => reject(new StepTimeoutError()), remaining); timer.unref?.(); })]);
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-  }
 }

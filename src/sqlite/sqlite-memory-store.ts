@@ -19,6 +19,8 @@ type SqliteRow = Record<string, unknown>;
 
 export interface SqliteMemoryStoreOptions {
   autoMigrate?: boolean;
+  /** Explicit lock-wait tuning only; not a SQL execution deadline. */
+  busyTimeoutMs?: number;
 }
 
 function parseJson(value: unknown): unknown {
@@ -107,6 +109,9 @@ export class SqliteMemoryStore implements MemoryStore, MemoryRepository, Candida
   private closed = false;
 
   constructor(readonly databasePath = homedir() + "/.open-continuity/memories.db", options: SqliteMemoryStoreOptions = {}) {
+    if (options.busyTimeoutMs !== undefined && (!Number.isInteger(options.busyTimeoutMs) || options.busyTimeoutMs < 0 || options.busyTimeoutMs > 10000)) {
+      throw new OpenContinuityError("VALIDATION_ERROR", "Invalid SQLite lock-wait budget", 400);
+    }
     if (databasePath !== ":memory:") mkdirSync(dirname(databasePath), { recursive: true });
     const database = new DatabaseSync(databasePath);
     try {
@@ -114,6 +119,7 @@ export class SqliteMemoryStore implements MemoryStore, MemoryRepository, Candida
       configureSqlite(this.database);
       if (options.autoMigrate !== false) migrateSqlite(this.database);
       else assertSqliteSchemaVersion(this.database);
+      if (options.busyTimeoutMs !== undefined) this.database.exec(`PRAGMA busy_timeout = ${options.busyTimeoutMs}`);
       this.secureDatabaseFiles();
     } catch (error) {
       if (database.isOpen) database.close();
