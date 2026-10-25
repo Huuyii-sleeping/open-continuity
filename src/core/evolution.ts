@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { OpenContinuityError } from "../shared/errors.js";
-import type { MemoryConfidence, MemoryEvolutionAction, MemoryEvolutionReceipt, ParsedRememberInput, ResolvedMemory } from "../shared/types.js";
+import { memoryFactSchema, type MemoryFact, type MemoryConfidence, type MemoryEvolutionAction, type MemoryEvolutionReceipt, type ParsedRememberInput, type ResolvedMemory } from "../shared/types.js";
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
@@ -9,7 +9,9 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
 function mergeJsonObjects(current: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = { ...current };
   for (const [key, value] of Object.entries(patch)) {
-    result[key] = isJsonObject(result[key]) && isJsonObject(value) ? mergeJsonObjects(result[key], value) : value;
+    const merged = Object.hasOwn(result, key) && isJsonObject(result[key]) && isJsonObject(value) ? mergeJsonObjects(result[key], value) : value;
+    // Treat __proto__/constructor as ordinary JSON keys, never prototype setters.
+    Object.defineProperty(result, key, { value: merged, enumerable: true, configurable: true, writable: true });
   }
   return result;
 }
@@ -19,6 +21,10 @@ export interface EvolutionResolution {
 }
 
 export function resolveEvolution(previous: ResolvedMemory | undefined, input: ParsedRememberInput): EvolutionResolution {
+  if (input.fact) memoryFactSchema.parse(input.fact);
+  if ((input.fact || previous?.fact) && (!input.userConfirmed || input.expectedVersion === undefined)) {
+    throw new OpenContinuityError("VALIDATION_ERROR", "Changing an explicit fact requires confirmation and compare-and-set", 400);
+  }
   if (input.expectedVersion !== undefined) {
     const currentVersion = previous?.version ?? 0;
     if (currentVersion !== input.expectedVersion) {
@@ -61,9 +67,9 @@ export function evolutionReceiptFromEvent(event: { evolutionAction?: MemoryEvolu
   };
 }
 
-export function sameEvolutionRequest(event: { inputValue?: unknown; value?: unknown; writeMode?: string; expectedVersion?: number; confidence?: MemoryConfidence }, input: ParsedRememberInput): boolean {
+export function sameEvolutionRequest(event: { inputValue?: unknown; value?: unknown; writeMode?: string; expectedVersion?: number; confidence?: MemoryConfidence; fact?: MemoryFact }, input: ParsedRememberInput): boolean {
   const storedInput = event.inputValue === undefined ? event.value : event.inputValue;
   const confidence = input.confidence === undefined ? undefined : { score: input.confidence, basis: input.confidenceBasis! };
   return isDeepStrictEqual(storedInput, input.value) && (event.writeMode ?? "replace") === input.writeMode
-    && event.expectedVersion === input.expectedVersion && isDeepStrictEqual(event.confidence, confidence);
+    && event.expectedVersion === input.expectedVersion && isDeepStrictEqual(event.confidence, confidence) && isDeepStrictEqual(event.fact, input.fact);
 }

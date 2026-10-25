@@ -11,5 +11,5 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "benchmarks/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "benchmarks/**/*.ts", "evals/ranking/**/*.ts", "evals/facts/**/*.ts"]
 }

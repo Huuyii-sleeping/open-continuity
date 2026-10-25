@@ -4,6 +4,7 @@ import type { ContextPackPolicy } from "./context-pack.js";
 import type { AgenticQueryPolicy } from "./agentic-query.js";
 import type { StorageKind } from "./store-factory.js";
 import { OPEN_CONTINUITY_VERSION } from "../version.js";
+import type { MemoryService } from "./memory-service.js";
 
 export type RuntimeProfile = "lite" | "team" | "enterprise";
 
@@ -39,6 +40,7 @@ export interface RuntimeCapabilities {
       supersedes: true;
       confidenceBasis: readonly ["user_asserted", "agent_inferred", "source_supported"];
       automaticSemanticMerge: false;
+      factDeclarations: "explicit_v1" | false;
     };
   };
   retrieval: {
@@ -46,7 +48,14 @@ export interface RuntimeCapabilities {
     channels: readonly RetrievalChannel[];
     candidateLimit: number;
     rrfK: number;
-    fullTextEngine: "fts5" | "postgres_text" | "substring";
+    fullTextEngine: "fts5" | "postgres_substring" | "substring";
+    rankingVersion: "core-ranking-v2" | null;
+    fullTextRanking: "bm25" | "match_order" | "unverified";
+    structuredContribution: 0 | null;
+    exactPrecedence: boolean | null;
+    factPolicy: "explicit-facts-v1" | null;
+    factGroupLimit: number;
+    semanticFactResolution: false;
     semantic: false;
     rerank: false;
     agentic: true;
@@ -125,7 +134,7 @@ export function resolveRuntimeProfile(env: NodeJS.ProcessEnv = process.env): Run
 }
 
 export function capabilitiesForProfile(config: RuntimeProfileConfig): RuntimeCapabilities {
-  const fullTextEngine = config.storage === "sqlite" ? "fts5" : config.storage === "postgres" ? "postgres_text" : "substring";
+  const fullTextEngine = config.storage === "sqlite" ? "fts5" : config.storage === "postgres" ? "postgres_substring" : "substring";
   return {
     version: OPEN_CONTINUITY_VERSION,
     profile: config.name,
@@ -139,7 +148,7 @@ export function capabilitiesForProfile(config: RuntimeProfileConfig): RuntimeCap
       privateMemory: true,
       evolution: {
         expectedVersion: true, writeModes: ["replace", "merge"], supersedes: true,
-        confidenceBasis: ["user_asserted", "agent_inferred", "source_supported"], automaticSemanticMerge: false,
+        confidenceBasis: ["user_asserted", "agent_inferred", "source_supported"], automaticSemanticMerge: false, factDeclarations: "explicit_v1",
       },
     },
     retrieval: {
@@ -148,6 +157,9 @@ export function capabilitiesForProfile(config: RuntimeProfileConfig): RuntimeCap
       candidateLimit: config.retrieval.candidateLimit,
       rrfK: config.retrieval.rrfK,
       fullTextEngine,
+      rankingVersion: "core-ranking-v2", fullTextRanking: config.storage === "sqlite" ? "bm25" : "match_order",
+      structuredContribution: 0, exactPrecedence: true,
+      factPolicy: "explicit-facts-v1", factGroupLimit: 100, semanticFactResolution: false,
       semantic: false, rerank: false, agentic: true, graph: false,
     },
     contextPack: {
@@ -171,12 +183,24 @@ export function capabilitiesForProfile(config: RuntimeProfileConfig): RuntimeCap
   };
 }
 
+/** Discovery reflects actual service policy; a profile is not a legacy provider's proof of support. */
+export function capabilitiesWithServiceSupport(capabilities: RuntimeCapabilities, service: MemoryService): RuntimeCapabilities {
+  const facts = service.supportsFactDeclarations(), policy = service.retrievalCapabilityPolicy();
+  return { ...capabilities,
+    memory: { ...capabilities.memory, evolution: { ...capabilities.memory.evolution, factDeclarations: facts ? "explicit_v1" : false } },
+    retrieval: { ...capabilities.retrieval, channels: policy.channels, candidateLimit: policy.candidateLimit, rrfK: policy.rrfK,
+      rankingVersion: policy.scored ? "core-ranking-v2" : null,
+      fullTextRanking: policy.scored ? capabilities.retrieval.fullTextRanking : "unverified",
+      structuredContribution: policy.scored ? 0 : null, exactPrecedence: policy.scored ? policy.exactPrecedence : null,
+      factPolicy: facts ? "explicit-facts-v1" : null, factGroupLimit: facts ? policy.factGroupLimit : 0 } };
+}
+
 export function developmentCapabilities(): RuntimeCapabilities {
   const lite = capabilitiesForProfile({ name: "lite", storage: "sqlite", compatibilityMode: null, retrieval: PROFILE_RETRIEVAL.lite, contextPack: PROFILE_CONTEXT_PACK.lite, agenticQuery: PROFILE_AGENTIC_QUERY.lite });
   return {
     ...lite,
     profile: "development",
     storage: "memory",
-    retrieval: { ...lite.retrieval, fullTextEngine: "substring" },
+    retrieval: { ...lite.retrieval, fullTextEngine: "substring", fullTextRanking: "match_order" },
   };
 }

@@ -3,6 +3,8 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMcpServer } from "../src/mcp/server.js";
 import { AccessPolicy } from "../src/core/access-policy.js";
+import { MemoryService } from "../src/core/memory-service.js";
+import { InMemoryStore } from "../src/core/memory-store.js";
 
 describe("MCP server", () => {
   const connections: Array<{ client: Client; server: ReturnType<typeof createMcpServer> }> = [];
@@ -13,6 +15,33 @@ describe("MCP server", () => {
       await server.close();
     }));
     connections.length = 0;
+  });
+  it("does not advertise scored ranking or fact declarations for a legacy custom Store", async () => {
+    const store = new InMemoryStore();
+    const service = new MemoryService({ appendRemember: input => store.appendRemember(input),
+      appendForget: (...args) => store.appendForget(...args), recall: input => store.recall(input), history: input => store.history(input) });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "fictional-legacy-agent", version: "0.1.0" }), server = createMcpServer(service);
+    connections.push({ client, server }); await server.connect(serverTransport); await client.connect(clientTransport);
+    const result = await client.callTool({ name: "memory_capabilities", arguments: {} });
+    const text = (result.content as Array<{ type: string; text?: string }>).find(item => item.type === "text")?.text;
+    expect(JSON.parse(text ?? "{}")).toMatchObject({ memory: { evolution: { factDeclarations: false } }, retrieval: {
+      rankingVersion: null, fullTextRanking: "unverified", structuredContribution: null, exactPrecedence: null, factPolicy: null, factGroupLimit: 0 } });
+  });
+  it("advertises and transports explicit facts without bypassing confirmation", async () => {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "fictional-fact-agent", version: "0.1.0" }), server = createMcpServer();
+    connections.push({ client, server });
+    await server.connect(serverTransport); await client.connect(clientTransport);
+    const tools = await client.listTools();
+    expect(tools.tools.find(tool => tool.name === "memory_remember")?.inputSchema.properties).toHaveProperty("fact");
+    const args = { userId: "fictional-mcp-user", agentId: "fictional-mcp-agent", key: "fictional", value: "fictional sqlite", kind: "decision", idempotencyKey: "fictional", fact: { group: "fictional-runtime" } };
+    expect((await client.callTool({ name: "memory_remember", arguments: args })).isError).toBe(true);
+    const saved = await client.callTool({ name: "memory_remember", arguments: { ...args, userConfirmed: true, expectedVersion: 0 } });
+    expect(saved.isError).not.toBe(true);
+    const recalled = await client.callTool({ name: "memory_recall", arguments: { userId: args.userId, agentId: args.agentId, query: "sqlite" } });
+    const text = (recalled.content as Array<{ type: string; text: string }>).find(item => item.type === "text")!;
+    expect(JSON.parse(text.text)).toMatchObject({ memories: [{ fact: { group: "fictional-runtime" }, retrieval: { factAssessment: { status: "active_assertion" } } }] });
   });
 
   it("exposes shared memory tools and serves a cross-agent read", async () => {

@@ -1,0 +1,1350 @@
+{
+  "format": "open-continuity-phase3-first-increment-v1",
+  "date": "2026-10-23",
+  "stage2RetestPassed": true,
+  "verification": {
+    "passed": true,
+    "fingerprint": "7f09e74f1f950894aa64999b4b81769fd5bb39cbb3f5b97e655e57f02fe79cbe",
+    "records": [
+      {
+        "name": "typecheck",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "full",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "suite",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "quality",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "public",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "candidates",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "ranking",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "benchmark",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "postgres",
+        "exit": 0,
+        "sourceUnchanged": true
+      }
+    ]
+  },
+  "source": {
+    "before": "0bebde725ffb5dbc68748733b06717c7ea657f4be2fd8d4e9526aa675b2662b8",
+    "after": "235fbb313cd5b1562fd95494364c6065e6c95f5e28b29b396bce0a07505f1200",
+    "lockHash": "2aa856b032f8b635b14cd2ada227460e5534d3369eeaf570b78cead6b14bf13c",
+    "state": "uncommitted working tree; hashes identify actual source"
+  },
+  "independentAudit": {
+    "rowCount": 480,
+    "rankingRecomputed": true,
+    "completeGrid": true,
+    "regressions": [],
+    "changedObservations": 9,
+    "changedCases": [
+      "broad-query-noise-control",
+      "boundary-unconfirmed-exact"
+    ],
+    "limits": "Baseline v1 lacks independently observed values; values are covered by contract tests, not reconstructed from this report."
+  },
+  "quality": {
+    "sqlite/recall": {
+      "before": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 33,
+          "value": 0.18181818181818182
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 31.5,
+            "denominator": 51,
+            "value": 0.6176470588235294
+          },
+          "mrr": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "ndcg": {
+            "numerator": 29.01514284269664,
+            "denominator": 51,
+            "value": 0.56892436946464
+          }
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 60,
+          "value": 0.35
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 45,
+          "value": 0.13333333333333333
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        }
+      },
+      "after": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 9,
+          "denominator": 33,
+          "value": 0.2727272727272727
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 34.5,
+            "denominator": 51,
+            "value": 0.6764705882352942
+          },
+          "mrr": {
+            "numerator": 33,
+            "denominator": 51,
+            "value": 0.6470588235294118
+          },
+          "ndcg": {
+            "numerator": 32.01514284269664,
+            "denominator": 51,
+            "value": 0.6277478988764047
+          }
+        },
+        "miss": {
+          "numerator": 18,
+          "denominator": 60,
+          "value": 0.3
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 48,
+          "value": 0.125
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        },
+        "leakage": {
+          "user": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "agent": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "task": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "private": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "userConfirmed": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "repeatStability": {
+          "numerator": 60,
+          "denominator": 60,
+          "value": 1
+        },
+        "rebuildStability": {
+          "numerator": 20,
+          "denominator": 20,
+          "value": 1
+        }
+      }
+    },
+    "sqlite/context": {
+      "before": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 30,
+          "value": 0.2
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "mrr": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "ndcg": {
+            "numerator": 26.39012274297152,
+            "denominator": 51,
+            "value": 0.5174533871170887
+          }
+        },
+        "miss": {
+          "numerator": 24,
+          "denominator": 54,
+          "value": 0.4444444444444444
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 36,
+          "value": 0.16666666666666666
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        }
+      },
+      "after": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 9,
+          "denominator": 30,
+          "value": 0.3
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "mrr": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "ndcg": {
+            "numerator": 29.39012274297152,
+            "denominator": 51,
+            "value": 0.5762769165288534
+          }
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 54,
+          "value": 0.3888888888888889
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 39,
+          "value": 0.15384615384615385
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        },
+        "leakage": {
+          "user": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "agent": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "task": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "private": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "userConfirmed": {
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0
+          }
+        },
+        "repeatStability": {
+          "numerator": 60,
+          "denominator": 60,
+          "value": 1
+        },
+        "rebuildStability": {
+          "numerator": 20,
+          "denominator": 20,
+          "value": 1
+        }
+      }
+    },
+    "inmemory/recall": {
+      "before": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 33,
+          "value": 0.18181818181818182
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 31.5,
+            "denominator": 51,
+            "value": 0.6176470588235294
+          },
+          "mrr": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "ndcg": {
+            "numerator": 29.01514284269664,
+            "denominator": 51,
+            "value": 0.56892436946464
+          }
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 60,
+          "value": 0.35
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 45,
+          "value": 0.13333333333333333
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        }
+      },
+      "after": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 33,
+          "value": 0.18181818181818182
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 31.5,
+            "denominator": 51,
+            "value": 0.6176470588235294
+          },
+          "mrr": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "ndcg": {
+            "numerator": 29.01514284269664,
+            "denominator": 51,
+            "value": 0.56892436946464
+          }
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 60,
+          "value": 0.35
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 45,
+          "value": 0.13333333333333333
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        },
+        "leakage": {
+          "user": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "agent": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "task": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "private": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "userConfirmed": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "repeatStability": {
+          "numerator": 60,
+          "denominator": 60,
+          "value": 1
+        },
+        "rebuildStability": {
+          "numerator": 20,
+          "denominator": 20,
+          "value": 1
+        }
+      }
+    },
+    "inmemory/context": {
+      "before": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 30,
+          "value": 0.2
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "mrr": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "ndcg": {
+            "numerator": 26.39012274297152,
+            "denominator": 51,
+            "value": 0.5174533871170887
+          }
+        },
+        "miss": {
+          "numerator": 24,
+          "denominator": 54,
+          "value": 0.4444444444444444
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 36,
+          "value": 0.16666666666666666
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        }
+      },
+      "after": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 30,
+          "value": 0.2
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "mrr": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "ndcg": {
+            "numerator": 26.39012274297152,
+            "denominator": 51,
+            "value": 0.5174533871170887
+          }
+        },
+        "miss": {
+          "numerator": 24,
+          "denominator": 54,
+          "value": 0.4444444444444444
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 36,
+          "value": 0.16666666666666666
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        },
+        "leakage": {
+          "user": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "agent": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "task": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "private": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "userConfirmed": {
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0
+          }
+        },
+        "repeatStability": {
+          "numerator": 60,
+          "denominator": 60,
+          "value": 1
+        },
+        "rebuildStability": {
+          "numerator": 20,
+          "denominator": 20,
+          "value": 1
+        }
+      }
+    },
+    "json/recall": {
+      "before": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 33,
+          "value": 0.18181818181818182
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 31.5,
+            "denominator": 51,
+            "value": 0.6176470588235294
+          },
+          "mrr": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "ndcg": {
+            "numerator": 29.01514284269664,
+            "denominator": 51,
+            "value": 0.56892436946464
+          }
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 60,
+          "value": 0.35
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 45,
+          "value": 0.13333333333333333
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        }
+      },
+      "after": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 33,
+          "value": 0.18181818181818182
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 31.5,
+            "denominator": 51,
+            "value": 0.6176470588235294
+          },
+          "mrr": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "ndcg": {
+            "numerator": 29.01514284269664,
+            "denominator": 51,
+            "value": 0.56892436946464
+          }
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 60,
+          "value": 0.35
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 45,
+          "value": 0.13333333333333333
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        },
+        "leakage": {
+          "user": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "agent": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "task": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "private": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "userConfirmed": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "repeatStability": {
+          "numerator": 60,
+          "denominator": 60,
+          "value": 1
+        },
+        "rebuildStability": {
+          "numerator": 20,
+          "denominator": 20,
+          "value": 1
+        }
+      }
+    },
+    "json/context": {
+      "before": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 30,
+          "value": 0.2
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "mrr": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "ndcg": {
+            "numerator": 26.39012274297152,
+            "denominator": 51,
+            "value": 0.5174533871170887
+          }
+        },
+        "miss": {
+          "numerator": 24,
+          "denominator": 54,
+          "value": 0.4444444444444444
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 36,
+          "value": 0.16666666666666666
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        }
+      },
+      "after": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 30,
+          "value": 0.2
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "mrr": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "ndcg": {
+            "numerator": 26.39012274297152,
+            "denominator": 51,
+            "value": 0.5174533871170887
+          }
+        },
+        "miss": {
+          "numerator": 24,
+          "denominator": 54,
+          "value": 0.4444444444444444
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 36,
+          "value": 0.16666666666666666
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        },
+        "leakage": {
+          "user": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "agent": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "task": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "private": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "userConfirmed": {
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0
+          }
+        },
+        "repeatStability": {
+          "numerator": 60,
+          "denominator": 60,
+          "value": 1
+        },
+        "rebuildStability": {
+          "numerator": 20,
+          "denominator": 20,
+          "value": 1
+        }
+      }
+    },
+    "postgres-pg-mem/recall": {
+      "before": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 33,
+          "value": 0.18181818181818182
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 31.5,
+            "denominator": 51,
+            "value": 0.6176470588235294
+          },
+          "mrr": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "ndcg": {
+            "numerator": 29.01514284269664,
+            "denominator": 51,
+            "value": 0.56892436946464
+          }
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 60,
+          "value": 0.35
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 45,
+          "value": 0.13333333333333333
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        }
+      },
+      "after": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 33,
+          "value": 0.18181818181818182
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 31.5,
+            "denominator": 51,
+            "value": 0.6176470588235294
+          },
+          "mrr": {
+            "numerator": 30,
+            "denominator": 51,
+            "value": 0.5882352941176471
+          },
+          "ndcg": {
+            "numerator": 29.01514284269664,
+            "denominator": 51,
+            "value": 0.56892436946464
+          }
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 60,
+          "value": 0.35
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 45,
+          "value": 0.13333333333333333
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        },
+        "leakage": {
+          "user": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "agent": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "task": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "private": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "userConfirmed": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          }
+        },
+        "repeatStability": {
+          "numerator": 60,
+          "denominator": 60,
+          "value": 1
+        },
+        "rebuildStability": {
+          "numerator": 20,
+          "denominator": 20,
+          "value": 1
+        }
+      }
+    },
+    "postgres-pg-mem/context": {
+      "before": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 30,
+          "value": 0.2
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "mrr": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "ndcg": {
+            "numerator": 26.39012274297152,
+            "denominator": 51,
+            "value": 0.5174533871170887
+          }
+        },
+        "miss": {
+          "numerator": 24,
+          "denominator": 54,
+          "value": 0.4444444444444444
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 36,
+          "value": 0.16666666666666666
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        }
+      },
+      "after": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 6,
+          "denominator": 30,
+          "value": 0.2
+        },
+        "at3": {
+          "recallMacro": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "mrr": {
+            "numerator": 27,
+            "denominator": 51,
+            "value": 0.5294117647058824
+          },
+          "ndcg": {
+            "numerator": 26.39012274297152,
+            "denominator": 51,
+            "value": 0.5174533871170887
+          }
+        },
+        "miss": {
+          "numerator": 24,
+          "denominator": 54,
+          "value": 0.4444444444444444
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 36,
+          "value": 0.16666666666666666
+        },
+        "currentFactSelection": {
+          "numerator": 6,
+          "denominator": 9,
+          "value": 0.6666666666666666
+        },
+        "leakage": {
+          "user": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "agent": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "task": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "private": {
+            "numerator": 0,
+            "denominator": 3,
+            "value": 0
+          },
+          "userConfirmed": {
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0
+          }
+        },
+        "repeatStability": {
+          "numerator": 60,
+          "denominator": 60,
+          "value": 1
+        },
+        "rebuildStability": {
+          "numerator": 20,
+          "denominator": 20,
+          "value": 1
+        }
+      }
+    }
+  },
+  "engineering": {
+    "phase2": {
+      "passed": 282,
+      "skipped": 37
+    },
+    "final": {
+      "passed": 312,
+      "skipped": 37,
+      "files": 43
+    },
+    "nativePostgres": {
+      "passed": 36,
+      "scope": "storage/candidate engineering; public ranking quality remains pg-mem"
+    }
+  },
+  "suite": {
+    "totals": {
+      "capture": 90,
+      "injection": 65,
+      "governance": 30,
+      "all": 185
+    },
+    "security": {
+      "leakageRate": {
+        "value": 0,
+        "numerator": 0,
+        "denominator": 40
+      },
+      "leakedCaseIds": []
+    },
+    "p95": 2.489
+  },
+  "qualityV1": {
+    "totals": {
+      "capture": 15,
+      "retrieval": 42,
+      "all": 57,
+      "required": 15,
+      "challenge": 42
+    },
+    "quality": {
+      "falseInjectionRate": {
+        "value": 0,
+        "numerator": 0,
+        "denominator": 6
+      },
+      "missRate": {
+        "value": 0.5833,
+        "numerator": 21,
+        "denominator": 36
+      }
+    },
+    "passRates": {
+      "required": {
+        "value": 1,
+        "numerator": 15,
+        "denominator": 15
+      },
+      "all": {
+        "value": 0.4211,
+        "numerator": 24,
+        "denominator": 57
+      },
+      "challenge": {
+        "value": 0.2143,
+        "numerator": 9,
+        "denominator": 42
+      }
+    }
+  },
+  "candidateComparison": {
+    "passed": true,
+    "rows": 420,
+    "regressions": 0
+  },
+  "ablation": {
+    "cases": 4,
+    "passed": true,
+    "note": "controlled evidence-layer signal isolation, not end-to-end generalization"
+  },
+  "benchmark": {
+    "before": [
+      {
+        "operation": "exact-key recall",
+        "iterations": 100,
+        "p50Ms": 1.663,
+        "p95Ms": 1.753,
+        "maxMs": 3.2
+      },
+      {
+        "operation": "FTS recall",
+        "iterations": 100,
+        "p50Ms": 3.006,
+        "p95Ms": 3.126,
+        "maxMs": 13.561
+      },
+      {
+        "operation": "Context Pack",
+        "iterations": 100,
+        "p50Ms": 3.066,
+        "p95Ms": 3.622,
+        "maxMs": 5.024
+      }
+    ],
+    "after": [
+      {
+        "operation": "exact-key recall",
+        "iterations": 100,
+        "p50Ms": 1.702,
+        "p95Ms": 2.935,
+        "maxMs": 3.81
+      },
+      {
+        "operation": "FTS recall",
+        "iterations": 100,
+        "p50Ms": 2.431,
+        "p95Ms": 3.483,
+        "maxMs": 12.336
+      },
+      {
+        "operation": "Context Pack",
+        "iterations": 100,
+        "p50Ms": 2.53,
+        "p95Ms": 3.208,
+        "maxMs": 7.314
+      }
+    ],
+    "latencyGate": "not established"
+  },
+  "performanceRecheck": {
+    "settings": {
+      "memories": 10000,
+      "runs": 3,
+      "warmups": 10,
+      "samplesPerOperation": 200,
+      "order": "alternating before/after; copies of same synthetic database"
+    },
+    "measurements": [
+      {
+        "operation": "exact",
+        "before": {
+          "p95Range": [
+            2.1657499999982974,
+            2.700542000000496
+          ],
+          "max": 3.8187499999994543,
+          "invalidResponses": 0
+        },
+        "after": {
+          "p95Range": [
+            2.7492910000000848,
+            5.691917000000103
+          ],
+          "max": 16.76208300000144,
+          "invalidResponses": 0
+        }
+      },
+      {
+        "operation": "full_text",
+        "before": {
+          "p95Range": [
+            3.7648340000014286,
+            7.544750000000022
+          ],
+          "max": 37.35637499999939,
+          "invalidResponses": 0
+        },
+        "after": {
+          "p95Range": [
+            3.66229199999907,
+            4.034666999999899
+          ],
+          "max": 8.919167000000016,
+          "invalidResponses": 0
+        }
+      },
+      {
+        "operation": "context",
+        "before": {
+          "p95Range": [
+            3.7827500000003056,
+            5.439292000000933
+          ],
+          "max": 9.37775000000147,
+          "invalidResponses": 0
+        },
+        "after": {
+          "p95Range": [
+            3.1557920000013837,
+            4.652583000000959
+          ],
+          "max": 8.803458000000319,
+          "invalidResponses": 0
+        }
+      }
+    ],
+    "note": "All tails retained; exact-key has visible higher tails in current runs, cause not established; code path itself is unchanged."
+  },
+  "status": {
+    "publicCandidateIntegration": "implemented",
+    "singleChannelOrderAndFusion": "implemented",
+    "exactTierAndEligibility": "implemented",
+    "currentVersionConsistency": "implemented",
+    "crossKeyFactResolution": "challenge",
+    "phase3Complete": false,
+    "phase4Started": false
+  },
+  "limits": [
+    "semantic/cross-language/stale-fact challenges unresolved",
+    "no performance SLO; observed tail cost retained",
+    "native PostgreSQL public quality not measured",
+    "workspace end-to-end and release matrix not established",
+    "Context purpose/scope policy still reorders Recall results",
+    "legacy custom Store retains consumer-side confirmation fallback"
+  ],
+  "commit": false,
+  "push": false,
+  "evidence": {
+    "storage": "persistent local directory outside repository; not remote CI",
+    "files": [
+      {
+        "path": "phase2/public/raw-report.json",
+        "sha256": "f670d9db1171af793ff0f0586eb00e81d14d54e6578b749ad9a79d05cbbf632c"
+      },
+      {
+        "path": "final/candidates/comparison.json",
+        "sha256": "2b1f6474316377e7a9fcd973c39956c0990ae556b64e466a70e56cf1331b4950"
+      },
+      {
+        "path": "final/candidates/raw-report.json",
+        "sha256": "d73ceee9abdae2bef0423afc3040e2ccbf1dc1102b467d02244f11203252e361"
+      },
+      {
+        "path": "final/public/raw-report.json",
+        "sha256": "89c32e99163c2bf397058a273b4691697af64809b89535849288fe84b89d5865"
+      },
+      {
+        "path": "final/ranking/ablation.json",
+        "sha256": "3130e31e48b71757a6a450de93c90b7a51b46730b0156fbf5d82392d868be346"
+      },
+      {
+        "path": "final/ranking/quality.json",
+        "sha256": "6b11fb6ab04f3fda6a8e87f20eee7d971518cb5d7b994b08561154a81735d2c9"
+      },
+      {
+        "path": "logs/final-benchmark.log",
+        "sha256": "42b435b425d8de9c907bf46fb0815f71c62781f6da9999ecdd56f494f696e4f6"
+      },
+      {
+        "path": "performance-recheck.json",
+        "sha256": "4bdf43d1c95928d72f030fe1a56acb2b6b76dbb61506042fb43911fd0e2f2d76"
+      },
+      {
+        "path": "final-passed.json",
+        "sha256": "b08eb7dc687e05cd0f0818ccf37453b1da9535c5de9722fedda18c7efad64510"
+      }
+    ]
+  }
+}

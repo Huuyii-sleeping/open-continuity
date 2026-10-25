@@ -5,9 +5,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createStoreFromEnv } from "../src/core/store-factory.js";
 import { JsonFileStore } from "../src/core/memory-store.js";
 import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
-import { resolveRuntimeProfile } from "../src/core/profile.js";
+import { capabilitiesForProfile, resolveRuntimeProfile } from "../src/core/profile.js";
 
 describe("store factory", () => {
+  it("declares PostgreSQL literal substring fallback without claiming native full-text", () => {
+    const config = resolveRuntimeProfile({ OPEN_CONTINUITY_PROFILE: "team" });
+    expect(capabilitiesForProfile(config).retrieval).toMatchObject({ fullTextEngine: "postgres_substring", semantic: false, rerank: false });
+  });
   const temporaryDirectories: string[] = [];
   afterEach(() => { for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true }); });
 

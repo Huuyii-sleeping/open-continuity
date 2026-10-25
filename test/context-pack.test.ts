@@ -18,7 +18,9 @@ describe("ContextPackBuilder", () => {
     expect(result.items.every((item) => item.reasons.includes("purpose_coding"))).toBe(true);
     expect(result.context.split("\n").map((line) => JSON.parse(line).key)).toEqual(result.items.map((item) => item.key));
     expect(result.budget.usedTokens).toBe(estimateContextTokens(result.context));
-    expect(result.retrieval).toMatchObject({ mode: "hybrid", channels: ["structured", "full_text"] });
+    expect(result.retrieval).toMatchObject({ mode: "hybrid", channels: ["full_text"] });
+    // taskId supplies visibility, not an explicit structured search condition.
+    expect(result.retrieval?.channelResults?.find(c => c.channel === "structured")).toMatchObject({ status: "skipped", skippedReason: "missing_structured_filter" });
   });
 
   it("omits whole memories at the token boundary instead of truncating them", async () => {

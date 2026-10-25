@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { OpenContinuityError } from "../shared/errors.js";
 
 const SQLITE_BUSY_RETRY_MS = 25;
 const SQLITE_BUSY_TIMEOUT_MS = 10_000;
@@ -82,9 +83,23 @@ const migrations: ReadonlyArray<ReadonlyArray<string>> = [
     "ALTER TABLE memory_events ADD COLUMN confidence REAL",
     "ALTER TABLE memory_events ADD COLUMN confidence_basis TEXT",
   ],
+  [
+    "ALTER TABLE memories_current ADD COLUMN fact TEXT",
+    "ALTER TABLE memories_current ADD COLUMN fact_group TEXT",
+    "ALTER TABLE memory_events ADD COLUMN fact TEXT",
+    "CREATE INDEX memories_current_fact_group_idx ON memories_current (user_id, scope, scope_identity, kind, fact_group, updated_at DESC, id DESC)",
+  ],
 ];
 
 export const LATEST_SQLITE_SCHEMA_VERSION = migrations.length;
+
+export function assertSqliteSchemaVersion(database: DatabaseSync): Set<number> {
+  const applied = new Set(database.prepare("SELECT version FROM open_continuity_schema_migrations").all().map((row) => Number(row.version)));
+  if ([...applied].some((version) => !Number.isInteger(version) || version < 1 || version > LATEST_SQLITE_SCHEMA_VERSION)) {
+    throw new OpenContinuityError("STORAGE_ERROR", "SQLite schema version is not supported by this runtime", 500);
+  }
+  return applied;
+}
 
 function isBusyError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -119,10 +134,7 @@ export function migrateSqlite(database: DatabaseSync): void {
         version INTEGER PRIMARY KEY,
         applied_at TEXT NOT NULL
       )`);
-      const applied = new Set(
-        database.prepare("SELECT version FROM open_continuity_schema_migrations").all()
-          .map((row) => Number(row.version)),
-      );
+      const applied = assertSqliteSchemaVersion(database);
       migrations.forEach((statements, index) => {
         const version = index + 1;
         if (applied.has(version)) return;

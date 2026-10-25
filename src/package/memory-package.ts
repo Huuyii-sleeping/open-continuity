@@ -6,10 +6,11 @@ import { OpenContinuityError } from "../shared/errors.js";
 import { memoryEventSchema, type MemoryEvent } from "../shared/types.js";
 import { SqliteMemoryStore } from "../sqlite/sqlite-memory-store.js";
 import { OPEN_CONTINUITY_VERSION } from "../version.js";
+import { memoryIdentity } from "../core/storage-contract.js";
 
 const PACKAGE_VERSION = "1.0";
 const manifestSchema = z.object({
-  format: z.literal("open-continuity-memory-package"), version: z.literal(PACKAGE_VERSION),
+  format: z.literal("open-continuity-memory-package"), version: z.enum([PACKAGE_VERSION, "1.1"]),
   createdAt: z.iso.datetime({ offset: true }), source: z.object({ application: z.literal("open-continuity"), version: z.string() }),
   counts: z.object({ memories: z.number().int().min(0), events: z.number().int().min(0) }),
   files: z.object({ memories: z.literal("memories.jsonl"), events: z.literal("events.jsonl") }),
@@ -20,8 +21,6 @@ export interface MemoryPackageManifest extends z.infer<typeof manifestSchema> {}
 
 function sha256(contents: string): string { return createHash("sha256").update(contents).digest("hex"); }
 function jsonl(values: unknown[]): string { return values.map((value) => JSON.stringify(value)).join("\n") + (values.length ? "\n" : ""); }
-function scopeIdentity(event: MemoryEvent): string { return event.scope === "task" ? event.taskId! : event.scope === "agent" ? event.agentId : "-"; }
-
 export function materializeMemories(events: MemoryEvent[]): Array<Record<string, unknown>> {
   const current = new Map<string, Record<string, unknown>>();
   for (const event of events) {
@@ -29,13 +28,14 @@ export function materializeMemories(events: MemoryEvent[]): Array<Record<string,
       for (const [key, memory] of current) if (memory.id === event.memoryId && memory.userId === event.userId) current.delete(key);
       continue;
     }
-    const key = [event.userId, event.scope, scopeIdentity(event), event.key].join(":");
+    const key = memoryIdentity(event);
     current.set(key, {
       id: event.memoryId, userId: event.userId, key: event.key, value: event.value, kind: event.kind, scope: event.scope,
       ...(event.taskId ? { taskId: event.taskId } : {}), ...(event.scope === "agent" ? { ownerAgentId: event.agentId } : {}),
       sensitivity: event.sensitivity, userConfirmed: event.userConfirmed, sourceEventId: event.id, sourceAgentId: event.agentId,
       updatedAt: event.createdAt, version: event.memoryVersion ?? 1, ...(event.supersedes ? { supersedes: event.supersedes } : {}),
       ...(event.confidence ? { confidence: event.confidence } : {}),
+      ...(event.fact ? { fact: event.fact } : {}),
     });
   }
   return [...current.values()].sort((left, right) => String(left.id).localeCompare(String(right.id)));
@@ -54,7 +54,7 @@ export function exportMemoryPackage(databasePath: string, outputDirectory: strin
   rmSync(temporary, { recursive: true, force: true });
   mkdirSync(temporary, { recursive: true, mode: 0o700 });
   const manifest: MemoryPackageManifest = {
-    format: "open-continuity-memory-package", version: PACKAGE_VERSION, createdAt: new Date().toISOString(),
+    format: "open-continuity-memory-package", version: events.some(event => event.fact) ? "1.1" : PACKAGE_VERSION, createdAt: new Date().toISOString(),
     source: { application: "open-continuity", version: OPEN_CONTINUITY_VERSION }, counts: { memories: memories.length, events: events.length },
     files: { memories: "memories.jsonl", events: "events.jsonl" },
     checksums: { memoriesSha256: sha256(memoriesContents), eventsSha256: sha256(eventsContents) },
@@ -82,6 +82,9 @@ export function importMemoryPackage(inputDirectory: string, databasePath: string
     throw new OpenContinuityError("VALIDATION_ERROR", "Memory Package checksum verification failed", 400);
   }
   const events = z.array(memoryEventSchema).parse(parseJsonLines(eventsContents));
+  if (events.some(event => event.fact) && manifest.version !== "1.1") {
+    throw new OpenContinuityError("VALIDATION_ERROR", "Fact declarations require Memory Package 1.1", 400);
+  }
   const memories = parseJsonLines(memoriesContents);
   if (events.length !== manifest.counts.events || memories.length !== manifest.counts.memories) {
     throw new OpenContinuityError("VALIDATION_ERROR", "Memory Package counts do not match the manifest", 400);

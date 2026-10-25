@@ -8,7 +8,7 @@ Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不
 
 ### 当前主线（V1.2 前置实验）
 
-当前优先验证一条完整、可迁移的 Adapter 链路，而不是继续扩展检索算法：
+三种 Adapter 维持既有边界；当前按阶段优化 Retrieval Core，阶段 0 建立基线，阶段 1 加固存储，阶段 2 交付候选召回，阶段 3 首个增量将候选接入公共检索与可解释融合：
 
 ```text
 Agent runtime -> Capture Adapter -> Conversation Inbox
@@ -30,6 +30,8 @@ Agent runtime -> Capture Adapter -> Conversation Inbox
 RAG、Agentic Retrieval、多路召回和图谱只是 Read Pipeline 的可插拔策略，不是产品本身的全部定义。
 
 ## 2. 当前事实与设计目标
+
+内核阶段文档见 [入口](./retrieval-core/README.md)、[基线](./retrieval-core/baseline-framework.md)、[阶段 1](./retrieval-core/phase-1-storage.md)、[阶段 2](./retrieval-core/phase-2-candidates.md)、[阶段 3 排名](./retrieval-core/phase-3-ranking.md)与[3C 显式事实](./retrieval-core/phase-3c-fact-design.md)。默认公共文本查询已接入四个内置 Store 的候选：SQLite BM25 原生顺序、exact 优先与真实通道排名融合，Structured 仅资格证据。旧自定义 Store/检索器继续明确使用 legacy 兼容路径。显式事实组/有效期/替代版本可保守核实，未声明的语义冲突仍为 Challenge；此前 Spike 仍在备份，不混回本实现。
 
 ### 当前 Developer Preview 已实现
 
@@ -86,7 +88,7 @@ RAG、Agentic Retrieval、多路召回和图谱只是 Read Pipeline 的可插拔
 
 目标是一个命令即可启动，不要求安装数据库服务。个人数据量通常不大，但仍需要索引、事务、稳定分页和全文检索，因此正式存储选择单文件 SQLite，而非 JSON。
 
-默认查询路径：
+目标查询路径（BM25/排名融合已接入公共入口，时效/置信度事实裁决仍为后续目标）：
 
 ```text
 scope / task / time 过滤
@@ -102,7 +104,7 @@ JSON 只承担演示、排障、备份和导入导出。Lite 默认不启动远�
 
 目标是支持多用户、多 Agent、多进程或多实例访问，正式存储使用 PostgreSQL；向量能力优先采用 pgvector，避免额外维护一套事实来源。
 
-默认查询路径：
+目标查询路径（原生全文、pgvector 与 rerank 尚未实现；当前仅 substring fallback）：
 
 ```text
 结构化/精确召回 ---\
@@ -268,6 +270,39 @@ memory-package/
 - 使用 RRF 融合候选并通过查询指纹保护分页游标。
 - 每条结果保留来源通道、rank 与融合分数，不改变既有权限语义。
 - Team Profile 的 pgvector 语义召回和 rerank 仍待实现。
+
+### Retrieval Core 阶段 1：可信存储
+
+- `MemoryRepository.list` 只负责结构化资格过滤与时间/id 稳定分页；`MemoryStore.recall` 保留兼容文本查找能力，两者不提供相关性承诺。
+- 统一对象副本、复合身份、幂等回执、CAS、历史与遗忘语义；SQLite 用真实故障注入验证当前状态、事件、FTS 和迁移事务。
+- 普通 Recall/History 游标 v2 绑定身份、权限与过滤条件，legacy 游标明确要求从第一页重启；带 query 的 Retrieval cursor 保留原协议。
+- PostgreSQL 使用标准 substring fallback 和事务锁，pg-mem 的 SQL/JSON/锁/回滚证据局限单独标记，真实集成测试需显式本地隔离环境。
+- [1B](./retrieval-core/phase-1b-writes.md) 与 [1C](./retrieval-core/phase-1c-pagination.md) 分开验收：回滚失败丢弃连接、未知提交通过原幂等键核实、SQLite 拒绝将 Forget 当作 Remember；原生 PostgreSQL 17.11 的存储专项在一次性容器验证，仍不替代 Team 发布或原生检索质量评测。
+
+### Retrieval Core 阶段 2：独立候选召回（staged Core API）
+
+以下记录阶段 2 当时的独立交付范围；当前公共接入见阶段 3。
+
+- 统一 `ScoredSearchHit`，区分通道位置、rankMeaning、原始分数模型/方向和匹配原因；无分数时明确 null，不把时间序号当相关性。
+- Exact 等值查 key，Structured 根据显式 key/kind/scope 独立产生过滤候选；后者不声称能回答 query，也不直接加入 Injection。
+- SQLite 在资格/可选确认过滤后产生候选，使用原 FTS5 trigram 的 BM25，真实分数优先、时间/id 破平；短项使用参数化字面 AND fallback。不改 SQL schema、tokenizer 或列 boost。
+- InMemory/JSON 保持完整 query substring 兼容，PostgreSQL 为标准 substring fallback；原生 PostgreSQL 的共享候选契约与模拟器质量指标分开验收。
+- `eval:candidates` 分通道、存储、数据集、质量/安全/稳定性/延迟/消融报告；原质量标注不变。新候选 top-K 不是分页，不接受旧 cursor；公共查询、游标、融合与 Context 默认行为不变。
+- [实现](./retrieval-core/phase-2-candidates.md) 与 [验收](./retrieval-core/phase-2c-validation.md) 单独记录；BM25 全表统计不提供跨用户统计侧信道隔离，语义/跨语言/旧事实选择继续为 challenge。
+- 2C 的 v2 评测报告校验完整逐题覆盖、预算、标注与来源指纹；同源码 legacy/native 对照、同集合 BM25 消融、容量成本及原生 PG 重试证据独立保留。没有把阶段 2 接入公共查询，也没有建立性能 SLO。
+
+### Retrieval Core 阶段 3：公共排名与证据（首个增量）
+
+3A/3B 的历史交付范围如下。后续 [3C](./retrieval-core/phase-3c-fact-design.md) 新增显式事实组/有效期/替代版本核实：可见、完整、无冲突的声明才可采用；缺证据拒绝裁决。SQL current/event 事实字段同事务，组查询走分区索引；不影响原 FTS tokenizer。未声明的旧事实继续为语义 challenge，不能仅凭更新时间裁决。
+
+- 四个内置 Store 的公共文本检索使用 scored candidate API；单通道保留原生排名，多个 query 通道使用 `1/(rrfK+channelRank)` 融合。
+- Exact tier 明确优先；Structured 只解释已匹配记录的资格，贡献 0，不补全无关候选。未加入置信度/时间 boost。
+- 原始分数、模型、方向、通道位置、贡献与选择原因附加到既有回执；原 score 保留数值兼容，单通道 fusedScore 为 null，Query 使用 query_sum 并标注每个 signal 的 query/step。
+- 查询游标绑定排名版本、身份/过滤、启用通道、候选预算、RRF 参数、确认策略；旧查询游标重启。分页限于有界候选集合，不提供并发快照。
+- Context/Query 确认策略在原生 top-K 前收紧。Context 的用途/预算优先级保留，消费者重排归阶段 4。
+- [设计](./retrieval-core/phase-3-ranking.md) 与 [验证](./retrieval-core/phase-3-validation.md) 分开；此首个增量交付时尚未包含 3C。当前 3A–3C 的确定性范围已实现并分别验收；未声明的跨 key 旧事实/语义冲突仍为 challenge。
+
+3C 的边界：同一 group 还必须同 user/scope/task或Agent/kind；private、确认和显式过滤先约束证据。单一/相同字面值只代表可见声明，不是权威真相。引用未知版本、循环、组预算耗尽均返回不确定性。补充读取只核实，不替代相关性召回；Query 在总 deadline 内最终核实累计声明。Context/Answer 的消费重排仍归阶段 4。
 
 ### V0.7：Profile Runtime（已实现）
 

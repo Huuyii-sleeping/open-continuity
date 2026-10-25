@@ -6,6 +6,20 @@ Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不
 
 当前发布候选为 `1.1.0-beta.1`，定位是 Developer Preview：Lite 本地闭环已可验证，Team 是实现预览，Enterprise 尚未实现。
 
+内核按阶段推进；[可执行基线与独立报告](docs/retrieval-core/baseline-framework.md) 分开展示召回、Context、安全、稳定性、容量性能和工程验证。运行 `npm run eval:baseline -- --report-dir=/tmp/core-baseline-run --capacity`；报告保留失败样例与未验证项，不提供综合总分。
+
+阶段 1 引入独立的结构化存储契约，统一幂等、版本、对象副本与游标过滤绑定；参见 [存储阶段实现与验收](docs/retrieval-core/phase-1-storage.md)。普通 Recall/History 的旧游标需从第一页重新开始。
+
+[阶段 2](docs/retrieval-core/phase-2-candidates.md) 建立 `CandidateRetrieval` / `searchCandidates`：Exact、Structured、Lexical 独立返回候选与匹配证据；SQLite 使用原生 BM25 和确定性短查询 fallback，其它存储如实保留 substring 兼容能力。
+
+[阶段 3 首个增量](docs/retrieval-core/phase-3-ranking.md) 已将四个内置存储的候选接入公共 Recall、Context、Query。单通道保留原生顺序，多通道融合真实排名；精确 key 优先，结构化资格贡献为 0。回执保留原始分数、排名、融合贡献和选择原因；排序版本与策略绑定检索游标，旧查询游标需重启。当前版本链与混合快照校验已覆盖，不同 key 的事实冲突仍为 challenge。Context 保留既有用途/预算策略；无 embedding、模型或新 Adapter。结果见[本轮验证](docs/retrieval-core/phase-3-validation.md)。
+
+[3C 显式事实裁决](docs/retrieval-core/phase-3c-fact-design.md) 在上述排名之后核实调用方声明的事实组、有效期与精确替代版本。声明需要 `userConfirmed` 与 `expectedVersion`；冲突、引用未核实或组被截断时省略并返回 `factReview`，不按更新时间猜赢家，也不把不匹配 query 的替代者补成答案。旧记忆无声明时保持兼容且标记未验证；原跨 key 语义 challenge 不改标注。SQL 自动迁移新增事实列/组索引；升级前必须备份，早期运行时可能打开新版数据库却忽略事实字段，不得用于升级后的数据库。含声明的 JSON ledger v2、Memory Package 1.1 也不能交给旧读取器，详见[兼容性](docs/compatibility.md)。
+
+[2C 验收记录](docs/retrieval-core/phase-2c-validation.md) 分开记录同源码读路径对照、BM25 消融、安全、稳定性、性能成本与工程检查。v2 候选报告支持 `--compare` 逐题校验；原标注与失败样例保留，无综合总分或生产 SLO 承诺。
+
+最新 [1B 写入/恢复](docs/retrieval-core/phase-1b-writes.md) 与 [1C 分页/权限](docs/retrieval-core/phase-1c-pagination.md) 分开查看。可显式运行 `npm run test:storage:postgres:docker`，在一次性本地 PostgreSQL 中验证原生事务/CAS/幂等；不读取现有数据库，不增加默认运行依赖。真实存储测试通过不代表实现了语义检索或完成 Team 发布验收。
+
 ```mermaid
 flowchart LR
   subgraph C[Agent clients]

@@ -32,6 +32,7 @@ describe("persistent MemoryStore contract", () => {
     else {
       const database = newDb({ autoCreateForeignKeyIndices: true });
       database.public.registerFunction({ name: "pg_advisory_xact_lock", args: [DataType.integer], returns: DataType.integer, implementation: () => 1 });
+      database.public.registerFunction({ name: "strpos", args: [DataType.text, DataType.text], returns: DataType.integer, implementation: (text: string, part: string) => text.indexOf(part) + 1 });
       const adapter = database.adapters.createPg();
       const postgresPool: DatabasePool = new adapter.Pool();
       pool = postgresPool;
