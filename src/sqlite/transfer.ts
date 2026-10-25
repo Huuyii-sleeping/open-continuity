@@ -3,14 +3,13 @@ import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { OpenContinuityError } from "../shared/errors.js";
-import { memoryEventSchema, type MemoryEvent } from "../shared/types.js";
+import type { MemoryEvent } from "../shared/types.js";
+import { decodeEventLedger, encodeEventLedger } from "../core/event-ledger.js";
 import { SqliteMemoryStore } from "./sqlite-memory-store.js";
-
-const ledgerSchema = z.object({ events: z.array(memoryEventSchema) });
 
 export function readJsonLedger(filePath: string): MemoryEvent[] {
   try {
-    return ledgerSchema.parse(JSON.parse(readFileSync(filePath, "utf8"))).events;
+    return decodeEventLedger(JSON.parse(readFileSync(filePath, "utf8")));
   } catch (error) {
     if (error instanceof OpenContinuityError) throw error;
     throw new OpenContinuityError("VALIDATION_ERROR", "Unable to read a valid OpenContinuity JSON ledger", 400,
@@ -22,7 +21,7 @@ export function writeJsonLedger(filePath: string, events: MemoryEvent[]): void {
   mkdirSync(dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    writeFileSync(temporaryPath, JSON.stringify({ events }, null, 2) + "\n", "utf8");
+    writeFileSync(temporaryPath, JSON.stringify(encodeEventLedger(events), null, 2) + "\n", { encoding: "utf8", mode: 0o600, flag: "wx" });
     renameSync(temporaryPath, filePath);
   } finally {
     if (existsSync(temporaryPath)) unlinkSync(temporaryPath);

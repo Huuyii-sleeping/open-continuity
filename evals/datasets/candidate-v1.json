@@ -1,0 +1,51 @@
+{
+  "version": "candidate-v1",
+  "description": "Fictional channel-specific judgments. Independent of the unchanged core-baseline-v1/quality-v1 judgments. Filter eligibility is not answer relevance. No semantic or model claims.",
+  "cases": [
+    { "channel": "exact", "key": "fictional-package-manager", "spec": { "id": "candidate-exact-key", "status": "required", "category": "exact", "query": "fictional-package-manager", "memories": [ { "label": "target", "key": "fictional-package-manager", "value": "fictional npm" }, { "label": "noise", "key": "other", "value": "fictional-package-manager" } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "exact", "spec": { "id": "candidate-exact-miss", "status": "required", "category": "negative", "query": "absent", "memories": [ { "label": "noise", "key": "other", "value": "absent" } ], "expected": { "relevant": [], "forbidden": ["noise"] } } },
+    { "channel": "structured", "spec": { "id": "candidate-structured-task", "status": "required", "category": "eligibility-not-relevance", "query": "unrelated query is intentionally ignored", "scope": "task", "taskId": "fictional-a", "memories": [ { "label": "target", "key": "task-a", "value": "fictional unrelated note", "scope": "task", "taskId": "fictional-a" }, { "label": "noise", "key": "task-b", "value": "fictional note", "scope": "task", "taskId": "fictional-b" } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "structured", "requireUserConfirmed": true, "spec": { "id": "candidate-confirmed-filter", "status": "required", "category": "confirmation", "query": "", "scope": "user", "memories": [ { "label": "target", "key": "approved", "value": "fictional note" }, { "label": "noise", "key": "unconfirmed", "value": "fictional note", "userConfirmed": false } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "full_text", "sqliteOnlyRequired": true, "spec": { "id": "candidate-reordered-terms", "status": "required", "category": "literal-terms", "query": "sqlite fictional", "memories": [ { "label": "target", "key": "decision", "value": "fictional sqlite choice" }, { "label": "noise", "key": "other", "value": "fictional shopping" } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "full_text", "sqliteOnlyRequired": true, "spec": { "id": "candidate-cross-column", "status": "required", "category": "literal-terms", "query": "sqlite WAL", "memories": [ { "label": "target", "key": "sqlite-decision", "value": "fictional WAL choice" }, { "label": "noise", "key": "other", "value": "fictional WAL alone" } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "full_text", "sqliteOnlyRequired": true, "spec": { "id": "candidate-short-terms", "status": "required", "category": "literal-short-fallback", "query": "结论 验证", "memories": [ { "label": "target", "key": "style", "value": "先给结论，再列验证结果" }, { "label": "noise", "key": "other", "value": "先给结论，再列购物清单" } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "full_text", "spec": { "id": "candidate-short-literal", "status": "required", "category": "literal-short-fallback", "query": "数据", "memories": [ { "label": "target", "key": "database", "value": "虚构数据库" }, { "label": "noise", "key": "other", "value": "虚构文件" } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "full_text", "spec": { "id": "candidate-percent-literal", "status": "required", "category": "literal", "query": "50%", "memories": [ { "label": "target", "key": "progress", "value": "fictional 50%" }, { "label": "noise", "key": "other", "value": "fictional 500" } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "full_text", "sqliteOnlyRequired": true, "spec": { "id": "candidate-bm25-not-recency", "status": "required", "category": "native-ranking", "query": "sqlite", "limit": 1, "memories": [ { "label": "target", "key": "focused", "value": "sqlite sqlite sqlite" }, { "label": "noise", "key": "diluted", "value": "sqlite fictional unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler unrelated filler" } ], "expected": { "relevant": ["target"], "forbidden": ["noise"], "ordered": ["target"] } } },
+    { "channel": "full_text", "requireUserConfirmed": true, "spec": { "id": "candidate-confirmed-before-budget", "status": "required", "category": "confirmation", "query": "needle", "limit": 1, "memories": [ { "label": "target", "key": "approved", "value": "fictional needle" }, { "label": "noise", "key": "unconfirmed", "value": "needle needle needle", "userConfirmed": false } ], "expected": { "relevant": ["target"], "forbidden": ["noise"] } } },
+    { "channel": "full_text", "spec": { "id": "candidate-negative-no-padding", "status": "required", "category": "negative", "query": "absent nebula", "memories": [ { "label": "noise", "key": "other", "value": "fictional sqlite" } ], "expected": { "relevant": [], "forbidden": ["noise"] } } },
+    { "channel": "exact", "key": "shared-key", "requireUserConfirmed": true, "spec": {
+      "id": "candidate-exact-boundaries", "status": "required", "category": "security", "query": "shared-key", "taskId": "fictional-allowed-task", "limit": 1,
+      "memories": [
+        { "label": "allowed", "key": "shared-key", "value": "fictional needle" },
+        { "label": "other-user", "key": "shared-key", "value": "fictional needle", "userId": "baseline-other-user" },
+        { "label": "other-agent", "key": "shared-key", "value": "fictional needle", "scope": "agent", "agentId": "baseline-other-agent" },
+        { "label": "other-task", "key": "shared-key", "value": "fictional needle", "scope": "task", "taskId": "fictional-other-task" },
+        { "label": "private", "key": "shared-key", "value": "fictional needle", "scope": "agent", "agentId": "baseline-fictional-reader", "sensitivity": "private" },
+        { "label": "unconfirmed", "key": "shared-key", "value": "fictional needle", "scope": "task", "taskId": "fictional-allowed-task", "userConfirmed": false }
+      ], "expected": { "relevant": ["allowed"], "forbidden": ["other-user","other-agent","other-task","private","unconfirmed"] }
+    } },
+    { "channel": "structured", "key": "shared-key", "requireUserConfirmed": true, "spec": {
+      "id": "candidate-structured-boundaries", "status": "required", "category": "security", "query": "ignored question", "taskId": "fictional-allowed-task", "limit": 1,
+      "memories": [
+        { "label": "allowed", "key": "shared-key", "value": "fictional needle" },
+        { "label": "other-user", "key": "shared-key", "value": "fictional needle", "userId": "baseline-other-user" },
+        { "label": "other-agent", "key": "shared-key", "value": "fictional needle", "scope": "agent", "agentId": "baseline-other-agent" },
+        { "label": "other-task", "key": "shared-key", "value": "fictional needle", "scope": "task", "taskId": "fictional-other-task" },
+        { "label": "private", "key": "shared-key", "value": "fictional needle", "scope": "agent", "agentId": "baseline-fictional-reader", "sensitivity": "private" },
+        { "label": "unconfirmed", "key": "shared-key", "value": "fictional needle", "scope": "task", "taskId": "fictional-allowed-task", "userConfirmed": false }
+      ], "expected": { "relevant": ["allowed"], "forbidden": ["other-user","other-agent","other-task","private","unconfirmed"] }
+    } },
+    { "channel": "full_text", "requireUserConfirmed": true, "spec": {
+      "id": "candidate-lexical-boundaries", "status": "required", "category": "security", "query": "needle", "taskId": "fictional-allowed-task", "limit": 1,
+      "memories": [
+        { "label": "allowed", "key": "shared-key", "value": "fictional needle" },
+        { "label": "other-user", "key": "shared-key", "value": "fictional needle", "userId": "baseline-other-user" },
+        { "label": "other-agent", "key": "shared-key", "value": "fictional needle", "scope": "agent", "agentId": "baseline-other-agent" },
+        { "label": "other-task", "key": "shared-key", "value": "fictional needle", "scope": "task", "taskId": "fictional-other-task" },
+        { "label": "private", "key": "shared-key", "value": "fictional needle", "scope": "agent", "agentId": "baseline-fictional-reader", "sensitivity": "private" },
+        { "label": "unconfirmed", "key": "shared-key", "value": "fictional needle", "scope": "task", "taskId": "fictional-allowed-task", "userConfirmed": false }
+      ], "expected": { "relevant": ["allowed"], "forbidden": ["other-user","other-agent","other-task","private","unconfirmed"] }
+    } }
+  ]
+}

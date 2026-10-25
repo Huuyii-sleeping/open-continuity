@@ -4,7 +4,7 @@ import { MemoryService } from "../core/memory-service.js";
 import { AccessPolicy } from "../core/access-policy.js";
 import { errorResponse, normalizeError } from "../shared/errors.js";
 import { agenticQueryInputSchema, contextPackInputSchema, handoffCreateInputSchema, handoffResumeInputSchema, historyInputSchema, recallInputSchema, rememberInputSchema, type RememberInput } from "../shared/types.js";
-import { developmentCapabilities, type RuntimeCapabilities } from "../core/profile.js";
+import { capabilitiesWithServiceSupport, developmentCapabilities, type RuntimeCapabilities } from "../core/profile.js";
 
 function requestApiKey(headers: Record<string, unknown>): string | undefined {
   const direct = headers["x-open-continuity-api-key"];
@@ -27,6 +27,7 @@ const booleanQuerySchema = z.preprocess((value) => {
 const limitQuerySchema = z.coerce.number().int().min(1).max(100).default(20);
 
 export function buildHttpApp(service = new MemoryService(), policy = new AccessPolicy(), capabilities: RuntimeCapabilities = developmentCapabilities()): FastifyInstance {
+  capabilities = capabilitiesWithServiceSupport(capabilities, service);
   const app = Fastify({ logger: false });
   app.setErrorHandler((error, _request, reply) => {
     const normalized = normalizeError(error);

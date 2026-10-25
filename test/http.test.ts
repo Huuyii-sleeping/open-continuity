@@ -2,8 +2,39 @@ import { describe, expect, it } from "vitest";
 import { AccessPolicy } from "../src/core/access-policy.js";
 import { MemoryService } from "../src/core/memory-service.js";
 import { buildHttpApp } from "../src/http/app.js";
+import { InMemoryStore } from "../src/core/memory-store.js";
 
 describe("HTTP API", () => {
+  it("reports legacy retrieval honestly and uses actual custom policy budgets", async () => {
+    const store = new InMemoryStore();
+    const legacy = new MemoryService({ appendRemember: input => store.appendRemember(input),
+      appendForget: (...args) => store.appendForget(...args), recall: input => store.recall(input), history: input => store.history(input) });
+    const app = buildHttpApp(legacy); await app.ready();
+    try {
+      expect((await app.inject({ method: "GET", url: "/v1/capabilities" })).json()).toMatchObject({
+        memory: { evolution: { factDeclarations: false } }, retrieval: { rankingVersion: null, fullTextRanking: "unverified",
+          structuredContribution: null, exactPrecedence: null, factPolicy: null, factGroupLimit: 0 } });
+    } finally { await app.close(); }
+    const configured = buildHttpApp(new MemoryService(new InMemoryStore(), { channels: ["full_text"], candidateLimit: 7, rrfK: 10, exactPrecedence: false, factGroupLimit: 3 }));
+    await configured.ready();
+    try {
+      expect((await configured.inject({ method: "GET", url: "/v1/capabilities" })).json()).toMatchObject({ retrieval: {
+        rankingVersion: "core-ranking-v2", channels: ["full_text"], candidateLimit: 7, rrfK: 10, exactPrecedence: false, factGroupLimit: 3 } });
+    } finally { await configured.close(); }
+  });
+  it("validates and persists explicit facts and exposes conservative conflict receipts", async () => {
+    const app = buildHttpApp(); await app.ready();
+    try {
+      const payload = { userId: "fictional-http-user", agentId: "fictional-http-agent", key: "fictional-a", value: "fictional sqlite", kind: "decision", idempotencyKey: "fictional-a", fact: { group: "fictional-runtime" } };
+      expect((await app.inject({ method: "POST", url: "/v1/memories", payload })).statusCode).toBe(400);
+      const valid = { ...payload, userConfirmed: true, expectedVersion: 0 };
+      expect((await app.inject({ method: "POST", url: "/v1/memories", payload: valid })).json()).toMatchObject({ current: { fact: { group: "fictional-runtime" } } });
+      await app.inject({ method: "POST", url: "/v1/memories", payload: { ...valid, key: "fictional-b", idempotencyKey: "fictional-b", value: "fictional postgres" } });
+      const result = await app.inject({ method: "GET", url: "/v1/memories?userId=fictional-http-user&agentId=fictional-http-agent&query=sqlite" });
+      expect(result.statusCode).toBe(200);
+      expect(result.json()).toMatchObject({ memories: [], retrieval: { factReview: { omitted: [{ assessment: { status: "conflict" } }] } } });
+    } finally { await app.close(); }
+  });
   it("exposes health and capability discovery", async () => {
     const app = buildHttpApp();
     await app.ready();

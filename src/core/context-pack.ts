@@ -23,7 +23,8 @@ export function estimateContextTokens(text: string): number {
 }
 
 function renderMemory(memory: ResolvedMemory): string {
-  return JSON.stringify({ key: memory.key, value: memory.value, kind: memory.kind, scope: memory.scope, version: memory.version, ...(memory.taskId ? { taskId: memory.taskId } : {}), ...(memory.confidence ? { confidence: memory.confidence } : {}) });
+  return JSON.stringify({ key: memory.key, value: memory.value, kind: memory.kind, scope: memory.scope, version: memory.version, ...(memory.taskId ? { taskId: memory.taskId } : {}), ...(memory.confidence ? { confidence: memory.confidence } : {}),
+    ...(memory.fact ? { fact: { group: memory.fact.group, validFrom: memory.fact.validFrom, validUntil: memory.fact.validUntil, status: memory.retrieval?.factAssessment?.status ?? "unresolved" } } : {}) });
 }
 
 function compareContextMemory(left: RankedContextMemory, right: RankedContextMemory): number {
@@ -37,7 +38,7 @@ export class ContextPackBuilder {
     const recall = await this.retrieval.recall({
       userId: input.userId, agentId: input.agentId, query: input.query, key: input.key, kind: input.kind, scope: input.scope, taskId: input.taskId,
       includePrivate: input.includePrivate, limit: 100, cursor: undefined,
-    });
+    }, { requireUserConfirmed: this.policy.requireUserConfirmed });
     return this.buildFromMemories(input, recall.memories, recall.retrieval);
   }
 
@@ -57,6 +58,10 @@ export class ContextPackBuilder {
     for (const candidate of ranked) {
       const line = renderMemory(candidate.memory);
       const estimatedTokens = estimateContextTokens(line);
+      if (candidate.memory.fact && !candidate.memory.retrieval?.factAssessment?.usable) {
+        omitted.push({ memoryId: candidate.memory.id, key: candidate.memory.key, estimatedTokens, reason: "fact_unresolved" });
+        continue;
+      }
       if (items.length >= maxMemories) {
         omitted.push({ memoryId: candidate.memory.id, key: candidate.memory.key, estimatedTokens, reason: "max_memories" });
         continue;
@@ -74,6 +79,8 @@ export class ContextPackBuilder {
         taskId: candidate.memory.taskId, estimatedTokens, priority: candidate.priority, reasons: candidate.reasons,
         sourceEventId: candidate.memory.sourceEventId, sourceAgentId: candidate.memory.sourceAgentId, updatedAt: candidate.memory.updatedAt,
         version: candidate.memory.version, supersedes: candidate.memory.supersedes, confidence: candidate.memory.confidence,
+        retrieval: candidate.memory.retrieval,
+        fact: candidate.memory.fact,
       });
     }
 

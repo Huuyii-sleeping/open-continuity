@@ -3,6 +3,8 @@ import { AgenticQueryEngine, type AgenticQueryPolicy } from "./agentic-query.js"
 import { ContextPackBuilder, type ContextPackPolicy } from "./context-pack.js";
 import { InMemoryStore, type MemoryStore } from "./memory-store.js";
 import { RetrievalPipeline, type RetrievalPipelineOptions } from "./retrieval.js";
+import { isDeepStrictEqual } from "node:util";
+import { OpenContinuityError } from "../shared/errors.js";
 
 const DEFAULT_CONTEXT_PACK_POLICY: ContextPackPolicy = { defaultTokenBudget: 1024, maxTokenBudget: 4096, maxMemories: 20 };
 const DEFAULT_AGENTIC_QUERY_POLICY: AgenticQueryPolicy = { defaultMaxSteps: 3, maxSteps: 4, defaultTimeoutMs: 1500, maxTimeoutMs: 5000, maxSubqueries: 3, historyLimit: 50 };
@@ -17,7 +19,17 @@ export class MemoryService {
     this.contextPack = new ContextPackBuilder(this.retrieval, contextPackPolicy);
     this.agenticQuery = new AgenticQueryEngine(store, this.retrieval, contextPackPolicy, agenticQueryPolicy);
   }
-  async remember(input: RememberInput) { return this.store.appendRemember(rememberInputSchema.parse(input)); }
+  supportsFactDeclarations(): boolean { return typeof this.store.readFactGroup === "function"; }
+  retrievalCapabilityPolicy() { return this.retrieval.capabilityPolicy(); }
+  async remember(input: RememberInput) {
+    const parsed = rememberInputSchema.parse(input);
+    if (parsed.fact && !this.supportsFactDeclarations()) throw new OpenContinuityError("VALIDATION_ERROR", "Store does not support explicit fact declarations", 400);
+    const receipt = await this.store.appendRemember(parsed);
+    if (parsed.fact && (!isDeepStrictEqual(receipt.current.fact, parsed.fact) || !isDeepStrictEqual(receipt.event.fact, parsed.fact))) {
+      throw new OpenContinuityError("STORAGE_ERROR", "Store violated the fact declaration contract", 500);
+    }
+    return receipt;
+  }
   async recall(input: RecallInput) { return this.retrieval.recall(recallInputSchema.parse(input)); }
   async context(input: ContextPackInput) { return this.contextPack.build(contextPackInputSchema.parse(input)); }
   async query(input: AgenticQueryInput) { return this.agenticQuery.query(agenticQueryInputSchema.parse(input)); }

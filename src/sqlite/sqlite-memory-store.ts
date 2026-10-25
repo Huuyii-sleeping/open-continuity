@@ -9,7 +9,11 @@ import { evolutionReceipt, evolutionReceiptFromEvent, resolveEvolution, sameEvol
 import type { MemoryReceiptLike, MemoryStore } from "../core/memory-store.js";
 import { OpenContinuityError } from "../shared/errors.js";
 import type { HistoryResult, MemoryEvent, MemoryKind, ParsedHistoryInput, ParsedRecallInput, ParsedRememberInput, RecallResult, ResolvedMemory } from "../shared/types.js";
-import { configureSqlite, migrateSqlite } from "./schema.js";
+import { assertSqliteSchemaVersion, configureSqlite, migrateSqlite } from "./schema.js";
+import { assertStructuredInput, storageFingerprint, type MemoryRepository, type StructuredMemoryInput } from "../core/storage-contract.js";
+import { candidateFilters, candidateQuery, exactCandidateKey, parseCandidateSearch, skippedCandidates, unscoredCandidate, type CandidateSearchRequest, type CandidateSearchResult, type CandidateSearchStore, type ScoredSearchHit } from "../core/candidate-search.js";
+import { memoryEventSchema, memoryFactSchema, type MemoryFact } from "../shared/types.js";
+import { parseFactGroupRequest, type FactGroupRequest } from "../core/fact-store.js";
 
 type SqliteRow = Record<string, unknown>;
 
@@ -38,6 +42,7 @@ function rowToMemory(row: SqliteRow): ResolvedMemory {
   };
   if (row.supersedes_event_id != null && row.supersedes_version != null) memory.supersedes = { eventId: String(row.supersedes_event_id), version: Number(row.supersedes_version) };
   if (row.confidence != null && row.confidence_basis != null) memory.confidence = { score: Number(row.confidence), basis: row.confidence_basis as NonNullable<ResolvedMemory["confidence"]>["basis"] };
+  if (row.fact != null) memory.fact = memoryFactSchema.parse(parseJson(row.fact));
   return memory;
 }
 
@@ -60,6 +65,7 @@ function rowToEvent(row: SqliteRow): MemoryEvent {
     if (row.supersedes_event_id != null && row.supersedes_version != null) event.supersedes = { eventId: String(row.supersedes_event_id), version: Number(row.supersedes_version) };
     if (row.confidence != null && row.confidence_basis != null) event.confidence = { score: Number(row.confidence), basis: row.confidence_basis as NonNullable<MemoryEvent["confidence"]>["basis"] };
   }
+  if (row.fact != null) event.fact = memoryFactSchema.parse(parseJson(row.fact));
   return event;
 }
 
@@ -75,17 +81,19 @@ function eventSnapshot(row: SqliteRow): ResolvedMemory {
   };
   if (row.supersedes_event_id != null && row.supersedes_version != null) memory.supersedes = { eventId: String(row.supersedes_event_id), version: Number(row.supersedes_version) };
   if (row.confidence != null && row.confidence_basis != null) memory.confidence = { score: Number(row.confidence), basis: row.confidence_basis as NonNullable<ResolvedMemory["confidence"]>["basis"] };
+  if (row.fact != null) memory.fact = memoryFactSchema.parse(parseJson(row.fact));
   return memory;
 }
 
 function sameRequest(row: SqliteRow, input: ParsedRememberInput): boolean {
-  return row.user_id === input.userId && row.agent_id === input.agentId && row.memory_key === input.key && row.kind === input.kind
+  return row.event_type === "memory_remembered" && row.user_id === input.userId && row.agent_id === input.agentId && row.memory_key === input.key && row.kind === input.kind
     && row.scope === input.scope && (row.task_id ?? undefined) === input.taskId && row.sensitivity === input.sensitivity
     && Number(row.user_confirmed) === Number(input.userConfirmed) && sameEvolutionRequest({
       inputValue: row.input_value == null ? undefined : parseJson(row.input_value), value: parseJson(row.value),
       writeMode: row.write_mode == null ? undefined : String(row.write_mode),
       expectedVersion: row.expected_version == null ? undefined : Number(row.expected_version),
       confidence: row.confidence == null || row.confidence_basis == null ? undefined : { score: Number(row.confidence), basis: row.confidence_basis as NonNullable<ResolvedMemory["confidence"]>["basis"] },
+      fact: row.fact == null ? undefined : memoryFactSchema.parse(parseJson(row.fact)),
     }, input)
     && isDeepStrictEqual(parseJson(row.metadata), input.metadata);
 }
@@ -94,7 +102,7 @@ function ftsPhrase(query: string): string {
   return `"${query.replaceAll('\"', '\"\"')}"`;
 }
 
-export class SqliteMemoryStore implements MemoryStore {
+export class SqliteMemoryStore implements MemoryStore, MemoryRepository, CandidateSearchStore {
   private readonly database: DatabaseSync;
   private closed = false;
 
@@ -105,7 +113,7 @@ export class SqliteMemoryStore implements MemoryStore {
       this.database = database;
       configureSqlite(this.database);
       if (options.autoMigrate !== false) migrateSqlite(this.database);
-      else this.database.prepare("SELECT 1 FROM open_continuity_schema_migrations LIMIT 1").get();
+      else assertSqliteSchemaVersion(this.database);
       this.secureDatabaseFiles();
     } catch (error) {
       if (database.isOpen) database.close();
@@ -114,6 +122,7 @@ export class SqliteMemoryStore implements MemoryStore {
   }
 
   appendRemember(input: ParsedRememberInput): MemoryReceiptLike {
+    input = structuredClone(input);
     return this.writeTransaction(() => {
       const duplicate = this.get("SELECT * FROM memory_events WHERE user_id = ? AND idempotency_key = ?", [input.userId, input.idempotencyKey]);
       if (duplicate) {
@@ -154,6 +163,11 @@ export class SqliteMemoryStore implements MemoryStore {
           JSON.stringify(input.metadata), current.version, JSON.stringify(input.value), resolution.action, input.writeMode, input.expectedVersion ?? null,
           resolution.supersedes?.eventId ?? null, resolution.supersedes?.version ?? null, resolution.confidence?.score ?? null, resolution.confidence?.basis ?? null],
       ));
+      if (input.fact || previousRow?.fact != null) {
+        this.writeFact(current.id, event.id, input.fact);
+        if (input.fact) { current.fact = input.fact; event.fact = input.fact; }
+        else delete current.fact;
+      }
       return { event, duplicate: false, current, evolution: evolutionReceipt(input, resolution) };
     });
   }
@@ -181,9 +195,16 @@ export class SqliteMemoryStore implements MemoryStore {
     });
   }
 
+  list(input: StructuredMemoryInput): RecallResult { assertStructuredInput(input); return this.read(input); }
+
   recall(input: ParsedRecallInput): RecallResult {
+    return input.query === undefined ? this.list(input as StructuredMemoryInput) : this.read(input);
+  }
+
+  private read(input: ParsedRecallInput): RecallResult {
     this.assertOpen();
-    const cursor = decodeCursor(input.cursor, "memory");
+    const fingerprint = storageFingerprint(input, "memory");
+    const cursor = decodeCursor(input.cursor, "memory", fingerprint);
     const values: SQLInputValue[] = [input.userId, input.agentId, input.taskId ?? null, input.taskId ?? null, Number(input.includePrivate)];
     const clauses = [
       "user_id = ?",
@@ -204,12 +225,57 @@ export class SqliteMemoryStore implements MemoryStore {
     const hasMore = rows.length > input.limit;
     const memories = hasMore ? rows.slice(0, input.limit) : rows;
     const last = memories.at(-1);
-    return { memories, nextCursor: hasMore && last ? encodeCursor("memory", last.updatedAt, last.id) : null };
+    return { memories, nextCursor: hasMore && last ? encodeCursor("memory", last.updatedAt, last.id, fingerprint) : null };
+  }
+
+  searchCandidates(request: CandidateSearchRequest): CandidateSearchResult {
+    this.assertOpen();
+    const input = parseCandidateSearch(request), skipped = skippedCandidates(input);
+    if (skipped) return skipped;
+    const values: SQLInputValue[] = [input.userId, input.agentId, input.taskId ?? null, input.taskId ?? null, Number(input.includePrivate)];
+    const clauses = ["m.user_id = ?", "(m.scope = 'user' OR (m.scope = 'agent' AND m.owner_agent_id = ?) OR (m.scope = 'task' AND ? IS NOT NULL AND m.task_id = ?))", "(? = 1 OR m.sensitivity <> 'private')"];
+    const add = (clause: string, value: SQLInputValue) => { clauses.push(clause); values.push(value); };
+    if (input.scope) add("m.scope = ?", input.scope);
+    if (input.kind) add("m.kind = ?", input.kind);
+    if (input.key) add("m.memory_key = ?", input.key);
+    if (input.requireUserConfirmed) clauses.push("m.user_confirmed = 1");
+    if (input.channel === "exact") add("m.memory_key = ?", exactCandidateKey(input)!);
+    const terms = [...new Set(candidateQuery(input).split(/\s+/u))];
+    const longTerms = terms.filter(term => [...term].length >= 3);
+    const bm25 = input.channel === "full_text" && longTerms.length > 0;
+    if (input.channel === "full_text") {
+      if (bm25) add("memories_fts MATCH ?", longTerms.map(ftsPhrase).join(" AND "));
+      for (const term of bm25 ? terms.filter(term => [...term].length < 3) : terms) {
+        clauses.push("(instr(lower(m.memory_key), lower(?)) > 0 OR instr(lower(m.value), lower(?)) > 0)"); values.push(term, term);
+      }
+    }
+    values.push(input.limit + 1);
+    // Eligibility and optional confirmation are applied in SQL BEFORE top-K truncation.
+    // No schema/tokenizer/column boosts change; raw FTS5 BM25 is lower-is-better.
+    const from = bm25 ? "memories_fts JOIN memories_current m ON m.id = memories_fts.memory_id" : "memories_current m";
+    try {
+      const rows = this.all(`SELECT m.*${bm25 ? ", bm25(memories_fts) AS candidate_score" : ""} FROM ${from} WHERE ${clauses.join(" AND ")} ORDER BY ${bm25 ? "candidate_score ASC, " : ""}m.updated_at DESC, m.id DESC LIMIT ?`, values);
+      const hits = rows.slice(0,input.limit).map((row,index): ScoredSearchHit => {
+        const memory = rowToMemory(row);
+        if (!bm25) {
+          const hit = unscoredCandidate(memory,input,index);
+          if (input.channel === "full_text" && terms.length > 1) hit.match = { type: "lexical_terms", reason: "all_literal_terms", filters: candidateFilters(input), termCount: terms.length };
+          return hit;
+        }
+        const score = Number(row.candidate_score);
+        if (!Number.isFinite(score)) throw new Error("invalid BM25 score");
+        return { memory, channel: input.channel, channelRank: index + 1, rankMeaning: "relevance", score: { model: "fts5_bm25", value: score, direction: "lower_is_better" },
+          match: { type: "lexical_terms", reason: "all_literal_terms", filters: candidateFilters(input), termCount: terms.length } };
+      });
+      return { channel: input.channel, status: "ok", hits, truncated: rows.length > input.limit, ordering: bm25 ? "bm25_then_updated_at_id" : "updated_at_id",
+        implementation: bm25 ? "sqlite_fts5_bm25" : input.channel === "full_text" ? "sqlite_literal_fallback" : "structured_lookup" };
+    } catch (error) { throw this.storageError(error); }
   }
 
   history(input: ParsedHistoryInput): HistoryResult {
     this.assertOpen();
-    const cursor = decodeCursor(input.cursor, "event");
+    const fingerprint = storageFingerprint(input, "event");
+    const cursor = decodeCursor(input.cursor, "event", fingerprint);
     const values: SQLInputValue[] = [input.userId, input.agentId, input.taskId ?? null, input.taskId ?? null, Number(input.includePrivate)];
     const clauses = [
       "user_id = ?",
@@ -223,7 +289,19 @@ export class SqliteMemoryStore implements MemoryStore {
     const hasMore = rows.length > input.limit;
     const events = hasMore ? rows.slice(0, input.limit) : rows;
     const last = events.at(-1);
-    return { events, nextCursor: hasMore && last ? encodeCursor("event", last.createdAt, last.id) : null };
+    return { events, nextCursor: hasMore && last ? encodeCursor("event", last.createdAt, last.id, fingerprint) : null };
+  }
+  readFactGroup(request: FactGroupRequest) {
+    this.assertOpen();
+    const input = parseFactGroupRequest(request);
+    const values: SQLInputValue[] = [input.userId, input.scope, scopeIdentity(input), input.kind, input.group, Number(input.includePrivate)];
+    const clauses = ["user_id = ?", "scope = ?", "scope_identity = ?", "kind = ?", "fact_group = ?", "(? = 1 OR sensitivity <> 'private')"];
+    if (input.requireUserConfirmed) clauses.push("user_confirmed = 1");
+    values.push(input.limit + 1);
+    try {
+      const rows = this.all(`SELECT * FROM memories_current WHERE ${clauses.join(" AND ")} ORDER BY updated_at DESC, id DESC LIMIT ?`, values);
+      return { memories: rows.slice(0, input.limit).map(rowToMemory), truncated: rows.length > input.limit };
+    } catch (error) { throw this.storageError(error); }
   }
 
   importEvents(events: MemoryEvent[]): void {
@@ -282,6 +360,7 @@ export class SqliteMemoryStore implements MemoryStore {
   }
 
   private importEvent(event: MemoryEvent): void {
+    event = memoryEventSchema.parse(event);
     if (event.type === "memory_forgotten") {
       const currentRow = this.get("SELECT * FROM memories_current WHERE user_id = ? AND id = ?", [event.userId, event.memoryId]);
       if (!currentRow) throw new OpenContinuityError("VALIDATION_ERROR", "Forgotten memory has no current imported state", 400, { eventId: event.id, memoryId: event.memoryId });
@@ -321,6 +400,14 @@ export class SqliteMemoryStore implements MemoryStore {
         JSON.stringify(event.metadata), current.version, event.inputValue === undefined ? null : JSON.stringify(event.inputValue), event.evolutionAction ?? null, event.writeMode ?? null,
         event.expectedVersion ?? null, event.supersedes?.eventId ?? null, event.supersedes?.version ?? null, event.confidence?.score ?? null, event.confidence?.basis ?? null],
     );
+    if (event.fact || previousRow?.fact != null) this.writeFact(current.id, event.id, event.fact);
+  }
+
+  private writeFact(memoryId: string, eventId: string, fact?: MemoryFact): void {
+    if (fact) memoryFactSchema.parse(fact);
+    const value = fact ? JSON.stringify(fact) : null;
+    this.run("UPDATE memories_current SET fact = ?, fact_group = ? WHERE id = ?", [value, fact?.group ?? null, memoryId]);
+    this.run("UPDATE memory_events SET fact = ? WHERE id = ?", [value, eventId]);
   }
 
   private writeTransaction<T>(operation: () => T): T {
@@ -347,6 +434,7 @@ export class SqliteMemoryStore implements MemoryStore {
   private all(sql: string, values: SQLInputValue[]): SqliteRow[] { return this.database.prepare(sql).all(...values) as SqliteRow[]; }
   private assertOpen(): void { if (this.closed) throw new OpenContinuityError("STORAGE_ERROR", "SQLite store is closed", 500); }
   private storageError(error: unknown): OpenContinuityError {
-    return new OpenContinuityError("STORAGE_ERROR", "SQLite operation failed", 500, process.env.NODE_ENV === "development" && error instanceof Error ? error.message : undefined);
+    if (error instanceof OpenContinuityError) return error;
+    return new OpenContinuityError("STORAGE_ERROR", "SQLite operation failed", 500);
   }
 }

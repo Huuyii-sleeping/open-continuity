@@ -1,0 +1,68 @@
+{
+  "format": "open-continuity-retrieval-core-baseline-v1",
+  "stage": 0,
+  "recordedAt": "2026-10-12",
+  "timezone": "Asia/Shanghai",
+  "source": {
+    "ref": "core-v2 branch point; origin/main at stage start",
+    "commit": "e23207aa9e746c71a599af8e2a0c913c5d59bf94",
+    "worktree": "detached-clean-baseline",
+    "excludesCoreV2Spike": true,
+    "excludesAdapterHardeningChanges": true,
+    "currentOriginMainObservedDuringStage": "9abe30956b67a99ff44fce11713c5838cfa364b0"
+  },
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v24.20.0",
+    "data": "repository-owned fictional fixtures and temporary databases only"
+  },
+  "commands": {
+    "typecheck": { "command": "npm run typecheck", "passed": true },
+    "test": { "command": "npm test", "passed": true, "testFiles": 35, "tests": 141 },
+    "suite": { "command": "npm run eval:suite", "passed": true },
+    "quality": { "command": "npm run eval:quality", "passed": true, "passMeaning": "required threshold only" },
+    "benchmark": { "command": "npm run benchmark:lite", "passed": true }
+  },
+  "suiteV1": {
+    "rounds": 5,
+    "capture": { "passed": 90, "total": 90 },
+    "injection": { "passed": 65, "total": 65 },
+    "governance": { "passed": 30, "total": 30 },
+    "all": { "passed": 185, "total": 185 },
+    "securityLeakageRate": { "value": 0, "numerator": 0, "denominator": 40 },
+    "latencyMs": { "p50": 2.094, "p95": 2.957, "p99": 4.217, "max": 4.217 }
+  },
+  "qualityV1": {
+    "rounds": 3,
+    "requiredPassRate": { "value": 1, "numerator": 15, "denominator": 15 },
+    "allPassRate": { "value": 0.3684, "numerator": 21, "denominator": 57 },
+    "challengePassRate": { "value": 0.1429, "numerator": 6, "denominator": 42 },
+    "securityLeakageRate": { "value": 0, "numerator": 0, "denominator": 6 },
+    "missRate": { "value": 0.6667, "numerator": 24, "denominator": 36 },
+    "reportedFalseInjectionRate": { "value": 0, "numerator": 0, "denominator": 6 },
+    "latencyMs": { "p50": 0.172, "p95": 0.284, "max": 1.14 },
+    "missingMetrics": ["recallAtK", "mrr", "ndcgAtK", "rankingStability"],
+    "metricCaveats": [
+      "reportedFalseInjectionRate excludes selected labels marked forbidden",
+      "a forbidden distractor can be selected while reportedFalseInjectionRate remains zero"
+    ]
+  },
+  "liteBenchmark": {
+    "dataset": { "memories": 10000, "events": 10000, "databaseBytes": 19103744 },
+    "seed": { "totalMs": 6831.033, "writesPerSecond": 1463.907 },
+    "samples": [
+      { "operation": "exact-key recall", "iterations": 100, "p50Ms": 1.838, "p95Ms": 2.032, "maxMs": 5.702 },
+      { "operation": "FTS recall", "iterations": 100, "p50Ms": 3.26, "p95Ms": 3.819, "maxMs": 8.368 },
+      { "operation": "Context Pack", "iterations": 100, "p50Ms": 3.43, "p95Ms": 3.949, "maxMs": 4.86 }
+    ],
+    "scope": "single-host synthetic baseline; not a cross-machine guarantee"
+  },
+  "observedCapabilityGaps": [
+    "SQLite FTS5 filters matches but orders by updatedAt and id rather than BM25",
+    "PostgreSQL declares postgres_text but implements ILIKE substring matching",
+    "structured channel is not an independent candidate retriever",
+    "RRF consumes storage recency position rather than relevance rank",
+    "real PostgreSQL behavior is not covered by the shared pg-mem contract"
+  ]
+}

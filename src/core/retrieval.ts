@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
+import { OpenContinuityError } from "../shared/errors.js";
+import { CandidateRetrieval } from "./candidate-search.js";
+import { rankEvidence, RANKING_VERSION } from "./evidence-ranking.js";
+import { FACT_POLICY, resolveFacts } from "./fact-resolution.js";
 import { decodeRetrievalCursor, encodeRetrievalCursor } from "./cursor.js";
 import type { MemoryStore } from "./memory-store.js";
+import type { StructuredMemoryInput } from "./storage-contract.js";
 import type { ParsedRecallInput, RecallResult, ResolvedMemory, RetrievalChannel } from "../shared/types.js";
 
 interface RetrieverHit {
@@ -24,6 +29,10 @@ export interface RetrievalPipelineOptions {
   channels?: readonly RetrievalChannel[];
   candidateLimit?: number;
   rrfK?: number;
+  exactPrecedence?: boolean;
+  /** Explicit ablation option; the production default is rrf. */
+  fusion?: "rrf" | "best_rank";
+  factGroupLimit?: number;
 }
 
 function retrievalFingerprint(input: ParsedRecallInput): string {
@@ -54,7 +63,11 @@ class StoreRetriever implements MemoryRetriever {
   ) {}
 
   async retrieve(input: ParsedRecallInput): Promise<ResolvedMemory[]> {
-    return (await this.store.recall(this.buildInput(input))).memories;
+    const request = this.buildInput(input);
+    const result = request.query === undefined && this.store.list
+      ? await this.store.list(request as StructuredMemoryInput)
+      : await this.store.recall(request);
+    return result.memories;
   }
 }
 
@@ -72,18 +85,33 @@ export class RetrievalPipeline {
   private readonly enabledChannels: ReadonlySet<RetrievalChannel>;
   private readonly candidateLimit: number;
   private readonly rrfK: number;
+  private readonly candidates?: CandidateRetrieval;
+  private readonly exactPrecedence: boolean;
+  private readonly fusion: "rrf" | "best_rank";
+  private readonly factGroupLimit: number;
 
   constructor(store: MemoryStore, options: RetrievalPipelineOptions = {}, retrievers?: Partial<{ exact: MemoryRetriever; structured: MemoryRetriever; fullText: MemoryRetriever }>) {
     this.store = store;
     this.candidateLimit = options.candidateLimit ?? 50;
     this.rrfK = options.rrfK ?? 60;
     this.enabledChannels = new Set(options.channels ?? ["exact", "structured", "full_text"]);
+    this.exactPrecedence = options.exactPrecedence ?? true;
+    this.fusion = options.fusion ?? "rrf";
+    this.factGroupLimit = options.factGroupLimit ?? 100;
+    if (!Number.isInteger(this.candidateLimit) || this.candidateLimit < 1 || this.candidateLimit > 100
+      || !Number.isFinite(this.rrfK) || this.rrfK < 1 || !this.enabledChannels.size
+      || [...this.enabledChannels].some(c => !["exact", "structured", "full_text"].includes(c))
+      || !["rrf", "best_rank"].includes(this.fusion) || !Number.isInteger(this.factGroupLimit)
+      || this.factGroupLimit < 1 || this.factGroupLimit > 100) throw new OpenContinuityError("VALIDATION_ERROR", "Invalid retrieval policy", 400);
+    // Old custom retrievers/stores keep their explicit compatibility path.
+    if (store.searchCandidates && !retrievers) this.candidates = new CandidateRetrieval({ searchCandidates: request => store.searchCandidates!(request) });
     const defaults = createDefaultRetrievers(store, this.candidateLimit);
     this.retrievers = { ...defaults, ...retrievers };
   }
 
-  async recall(input: ParsedRecallInput): Promise<RecallResult> {
+  async recall(input: ParsedRecallInput, policy: { requireUserConfirmed?: boolean } = {}): Promise<RecallResult> {
     if (!input.query?.trim()) return this.store.recall(input);
+    if (this.candidates) return this.recallCandidates(input, policy.requireUserConfirmed ?? false);
 
     const hits: RetrieverHit[][] = [];
     const channels: RetrievalChannel[] = [];
@@ -107,8 +135,18 @@ export class RetrievalPipeline {
     hits.push(fullTextMemories.map((memory) => ({ memory, channel: "full_text" as const })));
     if (fullTextMemories.length > 0) channels.push("full_text");
 
-    const ranked = this.fuse(hits);
-    const fingerprint = retrievalFingerprint(input);
+    let ranked = this.fuse(hits);
+    let factReview: NonNullable<RecallResult["retrieval"]>["factReview"];
+    if (ranked.some(item => item.memory.fact)) {
+      const resolved = await resolveFacts(ranked.map(item => ({ ...item, exactTier: 0,
+        retrieval: { score: item.score, channels: uniqueChannels(item.channels), ranks: item.ranks } })), this.store, input,
+        { requireUserConfirmed: policy.requireUserConfirmed ?? false, groupLimit: this.factGroupLimit });
+      const byId = new Map(resolved.ranked.map(item => [item.memory.id, item.retrieval]));
+      ranked = ranked.filter(item => byId.has(item.memory.id)).map(item => ({ ...item, memory: { ...item.memory, retrieval: byId.get(item.memory.id) } }));
+      factReview = resolved.review;
+    }
+    const fingerprint = createHash("sha256").update(JSON.stringify({ query: retrievalFingerprint(input), factPolicy: FACT_POLICY,
+      groupLimit: this.factGroupLimit, requireUserConfirmed: policy.requireUserConfirmed ?? false })).digest("base64url");
     const cursor = decodeRetrievalCursor(input.cursor, fingerprint);
     const afterCursor = cursor ? ranked.filter((item) => item.score < cursor.score
       || (item.score === cursor.score && (item.memory.updatedAt < cursor.timestamp
@@ -118,14 +156,56 @@ export class RetrievalPipeline {
     const pageItems = hasMore ? page.slice(0, input.limit) : page;
     const memories = pageItems.map((item) => ({
       ...item.memory,
-      retrieval: { score: item.score, channels: uniqueChannels(item.channels), ranks: item.ranks },
+      retrieval: { ...item.memory.retrieval, score: item.score, channels: uniqueChannels(item.channels), ranks: item.ranks },
     }));
     const last = pageItems.at(-1);
     return {
       memories,
       nextCursor: hasMore && last ? encodeRetrievalCursor(last.score, last.memory.updatedAt, last.memory.id, fingerprint) : null,
-      retrieval: { mode: "hybrid", channels: uniqueChannels(channels), candidateCount: ranked.length, candidateLimit: this.candidateLimit },
+      retrieval: { mode: "hybrid", channels: uniqueChannels(channels), candidateCount: ranked.length, candidateLimit: this.candidateLimit, ...(factReview ? { factReview } : {}) },
     };
+  }
+
+  async reviewFacts(input: ParsedRecallInput, memories: ResolvedMemory[], requireUserConfirmed = false) {
+    return resolveFacts(memories.map(memory => ({ memory, score: memory.retrieval?.score ?? 0,
+      exactTier: memory.retrieval?.exactTier ?? 0, retrieval: memory.retrieval ?? { score: 0, channels: [], ranks: {} } })),
+    this.store, input, { requireUserConfirmed, groupLimit: this.factGroupLimit });
+  }
+
+  /** Report the active pipeline, not assumptions derived solely from a storage profile. */
+  capabilityPolicy() {
+    return { scored: Boolean(this.candidates), channels: [...this.enabledChannels], candidateLimit: this.candidateLimit,
+      rrfK: this.rrfK, exactPrecedence: this.exactPrecedence, factGroupLimit: this.factGroupLimit };
+  }
+
+  private async recallCandidates(input: ParsedRecallInput, requireUserConfirmed: boolean): Promise<RecallResult> {
+    const configuration = { rankingVersion: RANKING_VERSION, candidateLimit: this.candidateLimit, rrfK: this.rrfK,
+      channels: [...this.enabledChannels].sort(), exactPrecedence: this.exactPrecedence, fusion: this.fusion, requireUserConfirmed,
+      factPolicy: FACT_POLICY, factGroupLimit: this.factGroupLimit };
+    const fingerprint = createHash("sha256").update(JSON.stringify({ queryFingerprint: retrievalFingerprint(input), configuration })).digest("base64url");
+    // Validate before issuing reads; old ranking cursors require restarting from page one.
+    const cursor = decodeRetrievalCursor(input.cursor, fingerprint, true);
+    const { cursor: _cursor, ...request } = input;
+    const batches = await this.candidates!.retrieve({ ...request, limit: this.candidateLimit, requireUserConfirmed }, [...this.enabledChannels]);
+    for (const batch of batches) for (const { memory } of batch.hits) {
+      if ((!input.includePrivate && memory.sensitivity === "private") || (requireUserConfirmed && !memory.userConfirmed)
+        || (memory.scope === "agent" && memory.ownerAgentId !== input.agentId) || (memory.scope === "task" && memory.taskId !== input.taskId)
+        || (input.key && memory.key !== input.key) || (input.kind && memory.kind !== input.kind) || (input.scope && memory.scope !== input.scope)) {
+        throw new OpenContinuityError("STORAGE_ERROR", "Candidate eligibility contract violated", 500);
+      }
+    }
+    const ranking = rankEvidence(batches, { rrfK: this.rrfK, exactPrecedence: this.exactPrecedence, fusion: this.fusion });
+    const { ranked, review } = await resolveFacts(ranking, this.store, input, { requireUserConfirmed, groupLimit: this.factGroupLimit });
+    const remaining = cursor ? ranked.filter(item => item.exactTier < cursor.exactTier!
+      || (item.exactTier === cursor.exactTier && (item.score < cursor.score || (item.score === cursor.score
+        && (item.memory.updatedAt < cursor.timestamp || (item.memory.updatedAt === cursor.timestamp && item.memory.id < cursor.id)))))) : ranked;
+    const page = remaining.slice(0,input.limit),last = page.at(-1);
+    return { memories: page.map(item => ({ ...item.memory, retrieval: item.retrieval })),
+      nextCursor: remaining.length > input.limit && last ? encodeRetrievalCursor(last.score,last.memory.updatedAt,last.memory.id,fingerprint,last.exactTier) : null,
+      retrieval: { mode: "hybrid", channels: (["exact", "structured", "full_text"] as const).filter(c => ranked.some(item => item.retrieval.channels.includes(c))), candidateCount: ranked.length, candidateLimit: this.candidateLimit,
+        path: "scored_candidates", rankingVersion: RANKING_VERSION, truncated: batches.some(b => b.truncated),
+        factReview: review,
+        channelResults: batches.map(({ hits, ...batch }) => ({ ...batch, candidateCount: hits.length })) } };
   }
 
 

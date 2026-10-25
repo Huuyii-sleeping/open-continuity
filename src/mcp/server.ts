@@ -4,8 +4,9 @@ import { z } from "zod";
 import { AccessPolicy } from "../core/access-policy.js";
 import { MemoryService } from "../core/memory-service.js";
 import { errorResponse } from "../shared/errors.js";
-import { developmentCapabilities, type RuntimeCapabilities } from "../core/profile.js";
+import { capabilitiesWithServiceSupport, developmentCapabilities, type RuntimeCapabilities } from "../core/profile.js";
 import { OPEN_CONTINUITY_VERSION } from "../version.js";
+import { memoryFactSchema } from "../shared/types.js";
 
 export interface McpIdentity { userId?: string; agentId?: string; }
 
@@ -20,6 +21,7 @@ function toolError(error: unknown) {
 }
 
 export function createMcpServer(service = new MemoryService(), policy = new AccessPolicy(), capabilities: RuntimeCapabilities = developmentCapabilities(), identity: McpIdentity = {}): McpServer {
+  capabilities = capabilitiesWithServiceSupport(capabilities, service);
   const server = new McpServer({ name: "open-continuity", version: OPEN_CONTINUITY_VERSION }, { instructions: SERVER_INSTRUCTIONS });
   const identitySchema = {
     ...(identity.userId ? {} : { userId: z.string().min(1) }),
@@ -44,6 +46,7 @@ export function createMcpServer(service = new MemoryService(), policy = new Acce
       idempotencyKey: z.string().min(1), metadata: z.record(z.string(), z.unknown()).optional(),
       writeMode: z.enum(["replace", "merge"]).optional(), expectedVersion: z.number().int().min(0).optional(),
       confidence: z.number().min(0).max(1).optional(), confidenceBasis: z.enum(["user_asserted", "agent_inferred", "source_supported"]).optional(),
+      fact: memoryFactSchema.optional(),
     },
   }, async (input) => {
     try {

@@ -35,18 +35,23 @@ function planId(input: ParsedAgenticQueryInput, queries: string[]): string {
   return createHash("sha256").update(JSON.stringify({ query: input.query, queries, strategy: input.strategy, includeHistory: input.includeHistory, key: input.key ?? null, kind: input.kind ?? null, scope: input.scope ?? null, taskId: input.taskId ?? null })).digest("base64url").slice(0, 16);
 }
 
-function combineRetrieval(left: ResolvedMemory["retrieval"], right: ResolvedMemory["retrieval"], score: number): ResolvedMemory["retrieval"] {
+function combineRetrieval(left: ResolvedMemory["retrieval"], right: ResolvedMemory["retrieval"], score: number, query: string, stepId: string): ResolvedMemory["retrieval"] {
   const channels = [...new Set([...(left?.channels ?? []), ...(right?.channels ?? [])])];
   const ranks: Partial<Record<RetrievalChannel, number>> = { ...(left?.ranks ?? {}) };
   for (const [channel, rank] of Object.entries(right?.ranks ?? {}) as Array<[RetrievalChannel, number]>) ranks[channel] = Math.min(ranks[channel] ?? rank, rank);
-  return { score: Number(score.toFixed(8)), channels, ranks };
+  const evidence = [...(left?.evidence ?? []), ...(right?.evidence ?? []).map(item => ({ ...item, query, stepId }))];
+  return { score: Number(score.toFixed(8)), channels, ranks, ...(right?.factAssessment ? { factAssessment: right.factAssessment } : {}), ...(right?.rankingVersion ? {
+    rankingVersion: right.rankingVersion, scoreModel: "query_sum" as const, fusedScore: null,
+    exactTier: Math.max(left?.exactTier ?? 0,right.exactTier ?? 0), evidence,
+    selectionReasons: [...new Set([...(left?.selectionReasons ?? []), ...(right.selectionReasons ?? [])])],
+  } : {}) };
 }
 
 export class AgenticQueryEngine {
   private readonly contextPack: ContextPackBuilder;
 
-  constructor(private readonly store: MemoryStore, private readonly retrieval: RetrievalPipeline, contextPolicy: ContextPackPolicy, private readonly policy: AgenticQueryPolicy) {
-    this.contextPack = new ContextPackBuilder(retrieval, contextPolicy);
+  constructor(private readonly store: MemoryStore, private readonly retrieval: RetrievalPipeline, private readonly contextPackPolicy: ContextPackPolicy, private readonly policy: AgenticQueryPolicy) {
+    this.contextPack = new ContextPackBuilder(retrieval, contextPackPolicy);
   }
 
   async query(input: ParsedAgenticQueryInput): Promise<AgenticQueryResult> {
@@ -84,14 +89,19 @@ export class AgenticQueryEngine {
           const recall = await this.withDeadline(this.retrieval.recall({
             userId: input.userId, agentId: input.agentId, query: step.query!, key: input.key, kind: input.kind, scope: input.scope, taskId: input.taskId,
             includePrivate: input.includePrivate, limit: 100, cursor: undefined,
-          }), deadline);
+          }, { requireUserConfirmed: this.contextPackPolicy.requireUserConfirmed }), deadline);
           recall.memories.forEach((memory, index) => {
             const current = evidenceById.get(memory.id) ?? { memory, matchedQueries: new Set<string>(), stepIds: new Set<string>(), score: 0 };
+            if (current.memory.sourceEventId !== memory.sourceEventId || current.memory.version !== memory.version) {
+              throw new OpenContinuityError("STORAGE_ERROR", "Inconsistent query evidence versions", 500);
+            }
+            const previousRetrieval = current.score === 0 ? undefined : current.memory.retrieval;
             current.score += memory.retrieval?.score ?? 1 / (60 + index + 1);
-            current.memory = { ...current.memory, ...memory, retrieval: combineRetrieval(current.memory.retrieval, memory.retrieval, current.score) };
+            current.memory = { ...current.memory, ...memory, retrieval: combineRetrieval(previousRetrieval, memory.retrieval, current.score, step.query!, step.id) };
             current.matchedQueries.add(step.query!); current.stepIds.add(step.id); evidenceById.set(memory.id, current);
           });
-          steps.push({ ...step, status: "completed", candidateCount: recall.memories.length, durationMs: Date.now() - stepStartedAt });
+          steps.push({ ...step, status: "completed", candidateCount: recall.memories.length, durationMs: Date.now() - stepStartedAt,
+            ...(recall.retrieval?.factReview ? { factReview: recall.retrieval.factReview } : {}) });
         } else if (evidenceById.size === 0) {
           steps.push({ ...step, status: "skipped", candidateCount: 0, durationMs: Date.now() - stepStartedAt, detail: "no_candidates" });
         } else {
@@ -108,6 +118,25 @@ export class AgenticQueryEngine {
       }
     }
 
+    let factReview: AgenticQueryResult["factReview"];
+    if ([...evidenceById.values()].some(item => item.memory.fact)) {
+      try {
+        if (Date.now() >= deadline) throw new StepTimeoutError();
+        const checked = await this.withDeadline(this.retrieval.reviewFacts({ ...input, limit: 100, cursor: undefined },
+          [...evidenceById.values()].map(item => item.memory), this.contextPackPolicy.requireUserConfirmed), deadline);
+        factReview = checked.review;
+        const accepted = new Map(checked.ranked.map(item => [item.memory.id, item.retrieval]));
+        for (const [id, item] of evidenceById) {
+          if (!accepted.has(id)) evidenceById.delete(id);
+          else item.memory = { ...item.memory, retrieval: accepted.get(id) };
+        }
+      } catch (error) {
+        if (!(error instanceof StepTimeoutError)) throw error;
+        // Never inject stale fact assessments when final validation runs out of budget.
+        for (const [id, item] of evidenceById) if (item.memory.fact) evidenceById.delete(id);
+        stoppedReason = "timeout";
+      }
+    }
     const evidence = this.materializeEvidence(evidenceById, historyEvents, plan.historyRequested, historyTruncatedMemoryIds);
     const syntheticMemories = evidence.map((item) => ({ ...item.memory, retrieval: { ...(item.memory.retrieval ?? { channels: [], ranks: {} }), score: item.score } }));
     const contextPack = this.contextPack.buildFromMemories(input, syntheticMemories);
@@ -123,6 +152,7 @@ export class AgenticQueryEngine {
 
     return {
       plan: { id: plan.id, complexity: plan.complexity, strategy: plan.strategy, rationale: plan.rationale, steps: plan.steps }, steps, evidence, contextPack, sufficiency,
+      ...(factReview ? { factReview } : {}),
       execution: { maxSteps, completedSteps: steps.filter((step) => step.status === "completed").length, timeoutMs, elapsedMs: Date.now() - startedAt, stoppedReason },
       fallback: { used: fallbackReasons.length > 0, reasons: [...new Set(fallbackReasons)], mode: "deterministic" },
     };

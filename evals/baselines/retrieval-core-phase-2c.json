@@ -1,0 +1,3392 @@
+{
+  "format": "open-continuity-phase-2c-validation-v1",
+  "date": "2026-10-23",
+  "scope": "staged candidate API only; public MCP query pipeline unchanged",
+  "reference": "same-source legacy lookup projection vs staged candidate API; not historical checkout recovery",
+  "source": {
+    "state": "uncommitted working tree; sourceHash identifies implementation, commit alone does not",
+    "commit": "e23207aa9e746c71a599af8e2a0c913c5d59bf94",
+    "sourceHash": "0bebde725ffb5dbc68748733b06717c7ea657f4be2fd8d4e9526aa675b2662b8"
+  },
+  "comparable": {
+    "harnessHash": "5dde0264ba9123f2667aa16c7fcf3e64cd5cc9f677ab226d52a137744560e671",
+    "coreDatasetHash": "97f0018b83f8043bc9ec7986df1537dacc46c52801e8249fe0e4244ad7139152",
+    "candidateDatasetHash": "2adf5b3dabd38d0b00e832ffa0508b14e60c4af63e305463881e365391493299",
+    "lockHash": "2aa856b032f8b635b14cd2ada227460e5534d3369eeaf570b78cead6b14bf13c",
+    "node": "v24.20.0",
+    "rounds": 3,
+    "repeats": 5,
+    "ks": [
+      1,
+      3,
+      5
+    ],
+    "backends": [
+      "sqlite",
+      "inmemory",
+      "json",
+      "postgres-pg-mem"
+    ],
+    "caseKeys": [
+      "[\"core-baseline-v1\",\"exact-phrase-wins\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"short-query-high-overlap\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"near-duplicate-paraphrase\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"english-semantic-paraphrase\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"typo-tolerant-recall\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"negation-does-not-match-positive\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"cross-language-equivalence\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"broad-query-noise-control\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"same-key-latest-replacement\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"same-key-json-merge\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"high-overlap-keyword-distractors\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"stale-vs-current-different-keys\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"unconfirmed-similar-memory\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"private-similar-memory\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"boundary-user\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"boundary-agent\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"boundary-task\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"boundary-unconfirmed-exact\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"negative-no-evidence\",\"full_text\"]",
+      "[\"core-baseline-v1\",\"multiple-relevant\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-exact-key\",\"exact\"]",
+      "[\"candidate-v1\",\"candidate-exact-miss\",\"exact\"]",
+      "[\"candidate-v1\",\"candidate-structured-task\",\"structured\"]",
+      "[\"candidate-v1\",\"candidate-confirmed-filter\",\"structured\"]",
+      "[\"candidate-v1\",\"candidate-reordered-terms\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-cross-column\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-short-terms\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-short-literal\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-percent-literal\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-bm25-not-recency\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-confirmed-before-budget\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-negative-no-padding\",\"full_text\"]",
+      "[\"candidate-v1\",\"candidate-exact-boundaries\",\"exact\"]",
+      "[\"candidate-v1\",\"candidate-structured-boundaries\",\"structured\"]",
+      "[\"candidate-v1\",\"candidate-lexical-boundaries\",\"full_text\"]"
+    ]
+  },
+  "candidateComparison": {
+    "passed": true,
+    "rows": 420,
+    "changedSignals": 168,
+    "regressions": 0,
+    "changedCases": [
+      "core-baseline-v1/broad-query-noise-control/full_text",
+      "candidate-v1/candidate-reordered-terms/full_text",
+      "candidate-v1/candidate-cross-column/full_text",
+      "candidate-v1/candidate-short-terms/full_text",
+      "candidate-v1/candidate-bm25-not-recency/full_text"
+    ],
+    "sameSource": true
+  },
+  "candidateBefore": {
+    "sqlite/core-baseline-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 6,
+        "denominator": 33,
+        "value": 0.18181818181818182
+      },
+      "recall3": {
+        "numerator": 25.5,
+        "denominator": 51,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 27,
+        "denominator": 51,
+        "value": 0.5294117647058824
+      },
+      "ndcg3": {
+        "numerator": 25.229564321267894,
+        "denominator": 51,
+        "value": 0.4946973396327038
+      },
+      "miss": {
+        "numerator": 27,
+        "denominator": 60,
+        "value": 0.45
+      },
+      "falseSelection": {
+        "numerator": 6,
+        "denominator": 39,
+        "value": 0.15384615384615385
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        }
+      },
+      "repeat": {
+        "numerator": 60,
+        "denominator": 60,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 20,
+        "denominator": 20,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 6,
+        "denominator": 9,
+        "value": 0.6666666666666666
+      },
+      "outsidePromisedCapability": []
+    },
+    "sqlite/candidate-v1/exact": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "sqlite/candidate-v1/structured": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "sqlite/candidate-v1/full_text": {
+      "required": {
+        "numerator": 15,
+        "denominator": 27,
+        "value": 0.5555555555555556
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "ndcg3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "miss": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "falseSelection": {
+        "numerator": 3,
+        "denominator": 15,
+        "value": 0.2
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "inmemory/core-baseline-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 6,
+        "denominator": 33,
+        "value": 0.18181818181818182
+      },
+      "recall3": {
+        "numerator": 25.5,
+        "denominator": 51,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 27,
+        "denominator": 51,
+        "value": 0.5294117647058824
+      },
+      "ndcg3": {
+        "numerator": 25.229564321267894,
+        "denominator": 51,
+        "value": 0.4946973396327038
+      },
+      "miss": {
+        "numerator": 27,
+        "denominator": 60,
+        "value": 0.45
+      },
+      "falseSelection": {
+        "numerator": 6,
+        "denominator": 39,
+        "value": 0.15384615384615385
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        }
+      },
+      "repeat": {
+        "numerator": 60,
+        "denominator": 60,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 20,
+        "denominator": 20,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 6,
+        "denominator": 9,
+        "value": 0.6666666666666666
+      },
+      "outsidePromisedCapability": []
+    },
+    "inmemory/candidate-v1/exact": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "inmemory/candidate-v1/structured": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "inmemory/candidate-v1/full_text": {
+      "required": {
+        "numerator": 15,
+        "denominator": 15,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "ndcg3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "miss": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "falseSelection": {
+        "numerator": 3,
+        "denominator": 15,
+        "value": 0.2
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": [
+        {
+          "id": "candidate-reordered-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 3,
+          "passed": false
+        }
+      ]
+    },
+    "json/core-baseline-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 6,
+        "denominator": 33,
+        "value": 0.18181818181818182
+      },
+      "recall3": {
+        "numerator": 25.5,
+        "denominator": 51,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 27,
+        "denominator": 51,
+        "value": 0.5294117647058824
+      },
+      "ndcg3": {
+        "numerator": 25.229564321267894,
+        "denominator": 51,
+        "value": 0.4946973396327038
+      },
+      "miss": {
+        "numerator": 27,
+        "denominator": 60,
+        "value": 0.45
+      },
+      "falseSelection": {
+        "numerator": 6,
+        "denominator": 39,
+        "value": 0.15384615384615385
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        }
+      },
+      "repeat": {
+        "numerator": 60,
+        "denominator": 60,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 20,
+        "denominator": 20,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 6,
+        "denominator": 9,
+        "value": 0.6666666666666666
+      },
+      "outsidePromisedCapability": []
+    },
+    "json/candidate-v1/exact": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "json/candidate-v1/structured": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "json/candidate-v1/full_text": {
+      "required": {
+        "numerator": 15,
+        "denominator": 15,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "ndcg3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "miss": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "falseSelection": {
+        "numerator": 3,
+        "denominator": 15,
+        "value": 0.2
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": [
+        {
+          "id": "candidate-reordered-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 3,
+          "passed": false
+        }
+      ]
+    },
+    "postgres-pg-mem/core-baseline-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 6,
+        "denominator": 33,
+        "value": 0.18181818181818182
+      },
+      "recall3": {
+        "numerator": 25.5,
+        "denominator": 51,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 27,
+        "denominator": 51,
+        "value": 0.5294117647058824
+      },
+      "ndcg3": {
+        "numerator": 25.229564321267894,
+        "denominator": 51,
+        "value": 0.4946973396327038
+      },
+      "miss": {
+        "numerator": 27,
+        "denominator": 60,
+        "value": 0.45
+      },
+      "falseSelection": {
+        "numerator": 6,
+        "denominator": 39,
+        "value": 0.15384615384615385
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        }
+      },
+      "repeat": {
+        "numerator": 60,
+        "denominator": 60,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 20,
+        "denominator": 20,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 6,
+        "denominator": 9,
+        "value": 0.6666666666666666
+      },
+      "outsidePromisedCapability": []
+    },
+    "postgres-pg-mem/candidate-v1/exact": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "postgres-pg-mem/candidate-v1/structured": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "postgres-pg-mem/candidate-v1/full_text": {
+      "required": {
+        "numerator": 15,
+        "denominator": 15,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "ndcg3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "miss": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "falseSelection": {
+        "numerator": 3,
+        "denominator": 15,
+        "value": 0.2
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": [
+        {
+          "id": "candidate-reordered-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 3,
+          "passed": false
+        }
+      ]
+    }
+  },
+  "candidateAfter": {
+    "sqlite/core-baseline-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 9,
+        "denominator": 33,
+        "value": 0.2727272727272727
+      },
+      "recall3": {
+        "numerator": 28.5,
+        "denominator": 51,
+        "value": 0.5588235294117647
+      },
+      "mrr3": {
+        "numerator": 30,
+        "denominator": 51,
+        "value": 0.5882352941176471
+      },
+      "ndcg3": {
+        "numerator": 28.229564321267894,
+        "denominator": 51,
+        "value": 0.5535208690444685
+      },
+      "miss": {
+        "numerator": 24,
+        "denominator": 60,
+        "value": 0.4
+      },
+      "falseSelection": {
+        "numerator": 6,
+        "denominator": 42,
+        "value": 0.14285714285714285
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        }
+      },
+      "repeat": {
+        "numerator": 60,
+        "denominator": 60,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 20,
+        "denominator": 20,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 6,
+        "denominator": 9,
+        "value": 0.6666666666666666
+      },
+      "outsidePromisedCapability": []
+    },
+    "sqlite/candidate-v1/exact": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "sqlite/candidate-v1/structured": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "sqlite/candidate-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 24,
+        "denominator": 24,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 24,
+        "denominator": 24,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 24,
+        "denominator": 24,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 24,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 24,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "inmemory/core-baseline-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 6,
+        "denominator": 33,
+        "value": 0.18181818181818182
+      },
+      "recall3": {
+        "numerator": 25.5,
+        "denominator": 51,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 27,
+        "denominator": 51,
+        "value": 0.5294117647058824
+      },
+      "ndcg3": {
+        "numerator": 25.229564321267894,
+        "denominator": 51,
+        "value": 0.4946973396327038
+      },
+      "miss": {
+        "numerator": 27,
+        "denominator": 60,
+        "value": 0.45
+      },
+      "falseSelection": {
+        "numerator": 6,
+        "denominator": 39,
+        "value": 0.15384615384615385
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        }
+      },
+      "repeat": {
+        "numerator": 60,
+        "denominator": 60,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 20,
+        "denominator": 20,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 6,
+        "denominator": 9,
+        "value": 0.6666666666666666
+      },
+      "outsidePromisedCapability": []
+    },
+    "inmemory/candidate-v1/exact": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "inmemory/candidate-v1/structured": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "inmemory/candidate-v1/full_text": {
+      "required": {
+        "numerator": 15,
+        "denominator": 15,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "ndcg3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "miss": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "falseSelection": {
+        "numerator": 3,
+        "denominator": 15,
+        "value": 0.2
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": [
+        {
+          "id": "candidate-reordered-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 3,
+          "passed": false
+        }
+      ]
+    },
+    "json/core-baseline-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 6,
+        "denominator": 33,
+        "value": 0.18181818181818182
+      },
+      "recall3": {
+        "numerator": 25.5,
+        "denominator": 51,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 27,
+        "denominator": 51,
+        "value": 0.5294117647058824
+      },
+      "ndcg3": {
+        "numerator": 25.229564321267894,
+        "denominator": 51,
+        "value": 0.4946973396327038
+      },
+      "miss": {
+        "numerator": 27,
+        "denominator": 60,
+        "value": 0.45
+      },
+      "falseSelection": {
+        "numerator": 6,
+        "denominator": 39,
+        "value": 0.15384615384615385
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        }
+      },
+      "repeat": {
+        "numerator": 60,
+        "denominator": 60,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 20,
+        "denominator": 20,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 6,
+        "denominator": 9,
+        "value": 0.6666666666666666
+      },
+      "outsidePromisedCapability": []
+    },
+    "json/candidate-v1/exact": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "json/candidate-v1/structured": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "json/candidate-v1/full_text": {
+      "required": {
+        "numerator": 15,
+        "denominator": 15,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "ndcg3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "miss": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "falseSelection": {
+        "numerator": 3,
+        "denominator": 15,
+        "value": 0.2
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": [
+        {
+          "id": "candidate-reordered-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 3,
+          "passed": false
+        }
+      ]
+    },
+    "postgres-pg-mem/core-baseline-v1/full_text": {
+      "required": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 6,
+        "denominator": 33,
+        "value": 0.18181818181818182
+      },
+      "recall3": {
+        "numerator": 25.5,
+        "denominator": 51,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 27,
+        "denominator": 51,
+        "value": 0.5294117647058824
+      },
+      "ndcg3": {
+        "numerator": 25.229564321267894,
+        "denominator": 51,
+        "value": 0.4946973396327038
+      },
+      "miss": {
+        "numerator": 27,
+        "denominator": 60,
+        "value": 0.45
+      },
+      "falseSelection": {
+        "numerator": 6,
+        "denominator": 39,
+        "value": 0.15384615384615385
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 0,
+          "value": null
+        }
+      },
+      "repeat": {
+        "numerator": 60,
+        "denominator": 60,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 20,
+        "denominator": 20,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 6,
+        "denominator": 9,
+        "value": 0.6666666666666666
+      },
+      "outsidePromisedCapability": []
+    },
+    "postgres-pg-mem/candidate-v1/exact": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 6,
+        "denominator": 6,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 6,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "postgres-pg-mem/candidate-v1/structured": {
+      "required": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "mrr3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "ndcg3": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "miss": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 9,
+        "value": 0
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 3,
+        "denominator": 3,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": []
+    },
+    "postgres-pg-mem/candidate-v1/full_text": {
+      "required": {
+        "numerator": 15,
+        "denominator": 15,
+        "value": 1
+      },
+      "challenge": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "recall3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "mrr3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "ndcg3": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "miss": {
+        "numerator": 12,
+        "denominator": 24,
+        "value": 0.5
+      },
+      "falseSelection": {
+        "numerator": 3,
+        "denominator": 15,
+        "value": 0.2
+      },
+      "safety": {
+        "user": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "agent": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "task": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "private": {
+          "numerator": 0,
+          "denominator": 3,
+          "value": 0
+        },
+        "userConfirmed": {
+          "numerator": 0,
+          "denominator": 6,
+          "value": 0
+        }
+      },
+      "repeat": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1
+      },
+      "rebuild": {
+        "numerator": 9,
+        "denominator": 9,
+        "value": 1
+      },
+      "currentFacts": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      },
+      "outsidePromisedCapability": [
+        {
+          "id": "candidate-reordered-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 1,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 2,
+          "passed": false
+        },
+        {
+          "id": "candidate-reordered-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-cross-column",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-short-terms",
+          "round": 3,
+          "passed": false
+        },
+        {
+          "id": "candidate-bm25-not-recency",
+          "round": 3,
+          "passed": false
+        }
+      ]
+    }
+  },
+  "capacity": {
+    "validityOnly": true,
+    "latencyGate": false,
+    "measurements": [
+      {
+        "size": 1000,
+        "operation": "exact",
+        "beforeP95RangeMs": [
+          0.1523749999996653,
+          0.15579100000013568
+        ],
+        "afterP95RangeMs": [
+          0.1398749999998472,
+          0.17312500000025466
+        ]
+      },
+      {
+        "size": 1000,
+        "operation": "structured",
+        "beforeP95RangeMs": [
+          0.06379199999992125,
+          0.07791699999961565
+        ],
+        "afterP95RangeMs": [
+          0.06041600000025937,
+          0.06879200000003038
+        ]
+      },
+      {
+        "size": 1000,
+        "operation": "full_text",
+        "beforeP95RangeMs": [
+          0.24816700000064884,
+          0.27729200000067067
+        ],
+        "afterP95RangeMs": [
+          0.28104199999961565,
+          0.3042089999999007
+        ]
+      },
+      {
+        "size": 1000,
+        "operation": "short",
+        "beforeP95RangeMs": [
+          0.058250000000043656,
+          0.061041999999360996
+        ],
+        "afterP95RangeMs": [
+          0.05808400000023539,
+          0.06391699999949196
+        ]
+      },
+      {
+        "size": 10000,
+        "operation": "exact",
+        "beforeP95RangeMs": [
+          2.1000829999975394,
+          2.724958000000697
+        ],
+        "afterP95RangeMs": [
+          1.7563329999975394,
+          2.465749999999389
+        ]
+      },
+      {
+        "size": 10000,
+        "operation": "structured",
+        "beforeP95RangeMs": [
+          0.06641699999818229,
+          0.09237500000017462
+        ],
+        "afterP95RangeMs": [
+          0.06116699999984121,
+          0.09041599999909522
+        ]
+      },
+      {
+        "size": 10000,
+        "operation": "full_text",
+        "beforeP95RangeMs": [
+          0.8792500000017753,
+          1.0056669999994483
+        ],
+        "afterP95RangeMs": [
+          1.0750840000000608,
+          1.3030839999992168
+        ]
+      },
+      {
+        "size": 10000,
+        "operation": "short",
+        "beforeP95RangeMs": [
+          0.05670800000007148,
+          0.06504100000165636
+        ],
+        "afterP95RangeMs": [
+          0.05733400000099209,
+          0.060833999999886146
+        ]
+      }
+    ]
+  },
+  "engineering": {
+    "typecheck": "passed",
+    "affected": {
+      "passed": 141,
+      "failed": 0,
+      "skipped": 1,
+      "files": 5
+    },
+    "fullDefault": {
+      "passed": 282,
+      "failed": 0,
+      "skipped": 37,
+      "files": 41
+    },
+    "postgresRetry": {
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0,
+      "files": 1
+    },
+    "firstPostgresAttempt": "failed: local Docker daemon was not running; retained log; retried after starting installed Docker",
+    "diffCheck": "passed"
+  },
+  "publicCompatibility": {
+    "suite": {
+      "passed": true,
+      "totals": {
+        "capture": 90,
+        "injection": 65,
+        "governance": 30,
+        "all": 185
+      },
+      "security": {
+        "leakageRate": {
+          "value": 0,
+          "numerator": 0,
+          "denominator": 40
+        },
+        "leakedCaseIds": []
+      },
+      "p95": 4.82
+    },
+    "qualityTotals": {
+      "capture": 15,
+      "retrieval": 42,
+      "all": 57,
+      "required": 15,
+      "challenge": 42
+    },
+    "independentOfCandidateMetrics": true
+  },
+  "ablations": [
+    {
+      "dataset": "core-baseline-v1",
+      "id": "boundary-unconfirmed-exact",
+      "native": [
+        "approved",
+        "unconfirmed"
+      ],
+      "withoutBm25": [
+        "unconfirmed",
+        "approved"
+      ]
+    },
+    {
+      "dataset": "candidate-v1",
+      "id": "candidate-bm25-not-recency",
+      "native": [
+        "target"
+      ],
+      "withoutBm25": [
+        "noise"
+      ]
+    }
+  ],
+  "unchangedFailures": [
+    {
+      "id": "short-query-high-overlap",
+      "selected": [],
+      "relevant": [
+        "target"
+      ],
+      "miss": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      }
+    },
+    {
+      "id": "near-duplicate-paraphrase",
+      "selected": [],
+      "relevant": [
+        "target"
+      ],
+      "miss": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      }
+    },
+    {
+      "id": "english-semantic-paraphrase",
+      "selected": [],
+      "relevant": [
+        "target"
+      ],
+      "miss": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      }
+    },
+    {
+      "id": "typo-tolerant-recall",
+      "selected": [],
+      "relevant": [
+        "target"
+      ],
+      "miss": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      }
+    },
+    {
+      "id": "cross-language-equivalence",
+      "selected": [],
+      "relevant": [
+        "target"
+      ],
+      "miss": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null
+      }
+    },
+    {
+      "id": "high-overlap-keyword-distractors",
+      "selected": [
+        "distractor"
+      ],
+      "relevant": [
+        "target"
+      ],
+      "miss": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      },
+      "falseSelection": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      }
+    },
+    {
+      "id": "stale-vs-current-different-keys",
+      "selected": [
+        "stale"
+      ],
+      "relevant": [
+        "current"
+      ],
+      "miss": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      },
+      "falseSelection": {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1
+      }
+    },
+    {
+      "id": "unconfirmed-similar-memory",
+      "selected": [
+        "approved"
+      ],
+      "relevant": [
+        "approved",
+        "unconfirmed"
+      ],
+      "miss": {
+        "numerator": 1,
+        "denominator": 2,
+        "value": 0.5
+      },
+      "falseSelection": {
+        "numerator": 0,
+        "denominator": 1,
+        "value": 0
+      }
+    }
+  ],
+  "limitations": [
+    "staged Core only; public query pipeline unchanged",
+    "no native PostgreSQL quality evaluation",
+    "workspace, statistics side-channel isolation, concurrent snapshot, production SLO and remote release matrix not established",
+    "synthetic regression data, not held-out generalization",
+    "latency cost retained; no speedup claim",
+    "initial evidence directory is local, not a CI archive; historical missing reports not recreated"
+  ],
+  "evidence": {
+    "storage": "local persistent evidence directory outside repository; not CI archive",
+    "files": [
+      {
+        "path": "evidence/current/capacity-comparison.json",
+        "bytes": 6555,
+        "sha256": "97dcef998a7e22e0a8adb8daaa1a96606b4806cbfe6e102fe6a4587f4c4c2d0b"
+      },
+      {
+        "path": "evidence/current/capacity.json",
+        "bytes": 165743,
+        "sha256": "360ef62ae8ec545c68e17bb1947896dae67e4acb3aa7a405be3c1fe1bececfa4"
+      },
+      {
+        "path": "evidence/current/comparison.json",
+        "bytes": 37268,
+        "sha256": "e6dafa9e80cb4786f95473d9d064c7a0f5bbcfad033e9c914bdad1c302c020f3"
+      },
+      {
+        "path": "evidence/current/raw-report.json",
+        "bytes": 1793610,
+        "sha256": "a6751ea5d241d40854d41901920cd1e58b5f9b4b307b86de01e3c5b9656bf40a"
+      },
+      {
+        "path": "evidence/public/raw-report.json",
+        "bytes": 1252469,
+        "sha256": "02b652aeb07de915d33d7aea6e257450116ab16999f1daa34f5d23b52d27a4d1"
+      },
+      {
+        "path": "evidence/reference/raw-report.json",
+        "bytes": 1414093,
+        "sha256": "565cb52e32931e6b948214350954b5512ace2857f16bbc254610c26685db91f2"
+      },
+      {
+        "path": "logs/postgres-retry.log",
+        "bytes": 585,
+        "sha256": "c6eb44299a753805b7376dd572f1913fe8f3ea01b2032a93b70a9122bf3d5aab"
+      },
+      {
+        "path": "logs/postgres.log",
+        "bytes": 462,
+        "sha256": "2da84ecf8d69ef184a576c3bb5cd9230d0d235b417958677ea37884fadd69e11"
+      },
+      {
+        "path": "execution-summary.json",
+        "bytes": 1512,
+        "sha256": "f4b92d0781f0a0a0bb6d96103b61281c707d570de400f32e22c80f1d1728a3a5"
+      }
+    ]
+  }
+}

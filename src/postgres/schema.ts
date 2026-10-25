@@ -1,4 +1,13 @@
 import type { QueryResult } from "pg";
+import { OpenContinuityError } from "../shared/errors.js";
+
+export const LATEST_POSTGRES_SCHEMA_VERSION = 3;
+
+export function assertPostgresSchemaVersion(rows: Array<{ version: unknown }>): void {
+  if (rows.some((row) => !Number.isInteger(Number(row.version)) || Number(row.version) < 1 || Number(row.version) > LATEST_POSTGRES_SCHEMA_VERSION)) {
+    throw new OpenContinuityError("STORAGE_ERROR", "PostgreSQL schema version is not supported by this runtime", 500);
+  }
+}
 
 export interface Queryable {
   query(text: string, values?: unknown[]): Promise<QueryResult>;
@@ -64,6 +73,10 @@ export const postgresSchemaStatements = [
   "ALTER TABLE memory_events ADD COLUMN IF NOT EXISTS supersedes_version INTEGER",
   "ALTER TABLE memory_events ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION",
   "ALTER TABLE memory_events ADD COLUMN IF NOT EXISTS confidence_basis TEXT",
+  "ALTER TABLE memories_current ADD COLUMN IF NOT EXISTS fact JSONB",
+  "ALTER TABLE memories_current ADD COLUMN IF NOT EXISTS fact_group TEXT",
+  "ALTER TABLE memory_events ADD COLUMN IF NOT EXISTS fact JSONB",
+  "CREATE INDEX IF NOT EXISTS memories_current_fact_group_idx ON memories_current (user_id, scope, scope_identity, kind, fact_group, updated_at DESC, id DESC)",
   "CREATE INDEX IF NOT EXISTS memories_current_recall_idx ON memories_current (user_id, updated_at DESC, id DESC)",
   "CREATE INDEX IF NOT EXISTS memories_current_task_idx ON memories_current (user_id, task_id, updated_at DESC)",
   "CREATE INDEX IF NOT EXISTS memories_current_agent_idx ON memories_current (user_id, owner_agent_id, updated_at DESC)",
@@ -75,11 +88,15 @@ export async function migratePostgres(client: Queryable): Promise<void> {
   await client.query("BEGIN");
   try {
     await client.query("SELECT pg_advisory_xact_lock($1)", [173535241]);
-    for (const statement of postgresSchemaStatements) await client.query(statement);
-    await client.query("INSERT INTO open_continuity_schema_migrations (version) VALUES ($1), ($2) ON CONFLICT (version) DO NOTHING", [1, 2]);
+    await client.query(postgresSchemaStatements[0]);
+    const applied = await client.query("SELECT version FROM open_continuity_schema_migrations");
+    assertPostgresSchemaVersion(applied.rows);
+    for (const statement of postgresSchemaStatements.slice(1)) await client.query(statement);
+    await client.query("INSERT INTO open_continuity_schema_migrations (version) VALUES ($1), ($2), ($3) ON CONFLICT (version) DO NOTHING", [1, 2, 3]);
     await client.query("COMMIT");
   } catch (error) {
-    await client.query("ROLLBACK");
+    try { await client.query("ROLLBACK"); }
+    catch { throw new OpenContinuityError("STORAGE_ERROR", "PostgreSQL transaction recovery failed", 500); }
     throw error;
   }
 }

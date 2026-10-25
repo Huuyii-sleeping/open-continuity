@@ -1,0 +1,475 @@
+{
+  "format": "open-continuity-phase-3c-summary-v1",
+  "date": "2026-10-23",
+  "branch": "codex/core-v2",
+  "sourceHash": "aeac8cffbef938519938f8bc99272a94df8402d06e6acfec74e360e6dc9598ed",
+  "referenceSourceHash": "235fbb313cd5b1562fd95494364c6065e6c95f5e28b29b396bce0a07505f1200",
+  "node": "v24.20.0",
+  "implementation": "explicit declaration adjudication, not semantic truth verification",
+  "engineering": {
+    "typecheck": true,
+    "full": {
+      "passed": 368,
+      "failed": 0,
+      "skipped": 48
+    },
+    "nativePostgres": {
+      "passed": 47,
+      "skipped": 0,
+      "fixture": "disposable tmpfs",
+      "cleaned": true
+    },
+    "suite": {
+      "passRate": {
+        "value": 1,
+        "numerator": 185,
+        "denominator": 185
+      },
+      "leakage": {
+        "value": 0,
+        "numerator": 0,
+        "denominator": 40
+      },
+      "p95Ms": 2.358
+    },
+    "qualityV1": {
+      "required": {
+        "value": 1,
+        "numerator": 15,
+        "denominator": 15
+      },
+      "challenge": {
+        "value": 0.2143,
+        "numerator": 9,
+        "denominator": 42
+      },
+      "knownFalseInjectionBlindSpot": true
+    },
+    "commands": [
+      {
+        "name": "typecheck",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "full",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "postgres",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "suite",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "quality",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "candidates",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "ranking",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "facts",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "baseline",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "benchmark-before",
+        "exit": 0,
+        "sourceUnchanged": true
+      },
+      {
+        "name": "benchmark-after",
+        "exit": 0,
+        "sourceUnchanged": true
+      }
+    ]
+  },
+  "publicBaseline": {
+    "observations": 480,
+    "regressions": 0,
+    "changedRankingSignals": 0,
+    "sqlite": {
+      "recall": {
+        "required": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 9,
+          "denominator": 33,
+          "value": 0.2727272727272727
+        },
+        "recallAt3": {
+          "numerator": 34.5,
+          "denominator": 51,
+          "value": 0.6764705882352942
+        },
+        "mrrAt3": {
+          "numerator": 33,
+          "denominator": 51,
+          "value": 0.6470588235294118
+        },
+        "ndcgAt3": {
+          "numerator": 32.01514284269664,
+          "denominator": 51,
+          "value": 0.6277478988764047
+        },
+        "miss": {
+          "numerator": 18,
+          "denominator": 60,
+          "value": 0.3
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 48,
+          "value": 0.125
+        }
+      },
+      "context": {
+        "required": {
+          "numerator": 30,
+          "denominator": 30,
+          "value": 1
+        },
+        "challenge": {
+          "numerator": 9,
+          "denominator": 30,
+          "value": 0.3
+        },
+        "recallAt3": {
+          "numerator": 30,
+          "denominator": 51,
+          "value": 0.5882352941176471
+        },
+        "mrrAt3": {
+          "numerator": 30,
+          "denominator": 51,
+          "value": 0.5882352941176471
+        },
+        "ndcgAt3": {
+          "numerator": 29.39012274297152,
+          "denominator": 51,
+          "value": 0.5762769165288534
+        },
+        "miss": {
+          "numerator": 21,
+          "denominator": 54,
+          "value": 0.3888888888888889
+        },
+        "falseSelection": {
+          "numerator": 6,
+          "denominator": 39,
+          "value": 0.15384615384615385
+        }
+      }
+    },
+    "currentFactSelection": {
+      "numerator": 6,
+      "denominator": 9,
+      "note": "Original undeclared cross-key challenge; recomputed from raw observations"
+    }
+  },
+  "facts": {
+    "distinctCases": 8,
+    "observedRows": 192,
+    "passedRows": 192,
+    "recall": {
+      "sqlite": {
+        "rows": 24,
+        "passed": 24,
+        "miss": {
+          "numerator": 0,
+          "denominator": 21,
+          "value": 0
+        },
+        "falseSelection": {
+          "numerator": 0,
+          "denominator": 21,
+          "value": 0
+        },
+        "stableRows": 24
+      },
+      "inmemory": {
+        "rows": 24,
+        "passed": 24,
+        "miss": {
+          "numerator": 0,
+          "denominator": 21,
+          "value": 0
+        },
+        "falseSelection": {
+          "numerator": 0,
+          "denominator": 21,
+          "value": 0
+        },
+        "stableRows": 24
+      },
+      "json": {
+        "rows": 24,
+        "passed": 24,
+        "miss": {
+          "numerator": 0,
+          "denominator": 21,
+          "value": 0
+        },
+        "falseSelection": {
+          "numerator": 0,
+          "denominator": 21,
+          "value": 0
+        },
+        "stableRows": 24
+      },
+      "postgres-pg-mem": {
+        "rows": 24,
+        "passed": 24,
+        "miss": {
+          "numerator": 0,
+          "denominator": 21,
+          "value": 0
+        },
+        "falseSelection": {
+          "numerator": 0,
+          "denominator": 21,
+          "value": 0
+        },
+        "stableRows": 24
+      }
+    },
+    "context": {
+      "sqlite": {
+        "rows": 24,
+        "passed": 24,
+        "miss": {
+          "numerator": 0,
+          "denominator": 18,
+          "value": 0
+        },
+        "falseSelection": {
+          "numerator": 0,
+          "denominator": 18,
+          "value": 0
+        },
+        "stableRows": 24
+      },
+      "inmemory": {
+        "rows": 24,
+        "passed": 24,
+        "miss": {
+          "numerator": 0,
+          "denominator": 18,
+          "value": 0
+        },
+        "falseSelection": {
+          "numerator": 0,
+          "denominator": 18,
+          "value": 0
+        },
+        "stableRows": 24
+      },
+      "json": {
+        "rows": 24,
+        "passed": 24,
+        "miss": {
+          "numerator": 0,
+          "denominator": 18,
+          "value": 0
+        },
+        "falseSelection": {
+          "numerator": 0,
+          "denominator": 18,
+          "value": 0
+        },
+        "stableRows": 24
+      },
+      "postgres-pg-mem": {
+        "rows": 24,
+        "passed": 24,
+        "miss": {
+          "numerator": 0,
+          "denominator": 18,
+          "value": 0
+        },
+        "falseSelection": {
+          "numerator": 0,
+          "denominator": 18,
+          "value": 0
+        },
+        "stableRows": 24
+      }
+    },
+    "semanticGeneralization": "not tested",
+    "originalJudgmentsChanged": false
+  },
+  "performance": {
+    "annotatedCapacityBefore": [
+      {
+        "size": 1000,
+        "operation": "single_group",
+        "p95RoundsMs": [
+          1.006,
+          0.941,
+          0.979
+        ],
+        "maxMs": 13.824,
+        "samples": 600
+      },
+      {
+        "size": 1000,
+        "operation": "many_groups",
+        "p95RoundsMs": [
+          4.159,
+          3.583,
+          1.965
+        ],
+        "maxMs": 20.366,
+        "samples": 600
+      },
+      {
+        "size": 10000,
+        "operation": "single_group",
+        "p95RoundsMs": [
+          3.673,
+          2.907,
+          3.377
+        ],
+        "maxMs": 9.066,
+        "samples": 600
+      },
+      {
+        "size": 10000,
+        "operation": "many_groups",
+        "p95RoundsMs": [
+          17.926,
+          18.64,
+          19.789
+        ],
+        "maxMs": 50.592,
+        "samples": 600
+      }
+    ],
+    "annotatedCapacityAfter": [
+      {
+        "size": 1000,
+        "operation": "single_group",
+        "p95RoundsMs": [
+          1.132,
+          0.737,
+          0.776
+        ],
+        "maxMs": 25.081,
+        "samples": 600
+      },
+      {
+        "size": 1000,
+        "operation": "many_groups",
+        "p95RoundsMs": [
+          3.948,
+          3.854,
+          3.503
+        ],
+        "maxMs": 29.985,
+        "samples": 600
+      },
+      {
+        "size": 10000,
+        "operation": "single_group",
+        "p95RoundsMs": [
+          3.616,
+          6.807,
+          5.456
+        ],
+        "maxMs": 20.462,
+        "samples": 600
+      },
+      {
+        "size": 10000,
+        "operation": "many_groups",
+        "p95RoundsMs": [
+          28.325,
+          23.028,
+          24.557
+        ],
+        "maxMs": 57.519,
+        "samples": 600
+      }
+    ],
+    "benchmarkBefore": [
+      {
+        "operation": "exact-key recall",
+        "iterations": 100,
+        "p50Ms": 1.822,
+        "p95Ms": 2.035,
+        "maxMs": 2.885
+      },
+      {
+        "operation": "FTS recall",
+        "iterations": 100,
+        "p50Ms": 2.9,
+        "p95Ms": 4.766,
+        "maxMs": 9.805
+      },
+      {
+        "operation": "Context Pack",
+        "iterations": 100,
+        "p50Ms": 3.256,
+        "p95Ms": 4.096,
+        "maxMs": 8.483
+      }
+    ],
+    "benchmarkAfter": [
+      {
+        "operation": "exact-key recall",
+        "iterations": 100,
+        "p50Ms": 1.936,
+        "p95Ms": 2.155,
+        "maxMs": 2.959
+      },
+      {
+        "operation": "FTS recall",
+        "iterations": 100,
+        "p50Ms": 2.905,
+        "p95Ms": 4.183,
+        "maxMs": 7.878
+      },
+      {
+        "operation": "Context Pack",
+        "iterations": 100,
+        "p50Ms": 2.762,
+        "p95Ms": 4.552,
+        "maxMs": 7.86
+      }
+    ],
+    "note": "All synthetic; serial final workloads, no latency SLO or statistical speedup claim. Separate workload denominators."
+  },
+  "remaining": [
+    "semantic/implicit relationships",
+    "source authentication",
+    "held-out fact quality",
+    "native PostgreSQL public quality",
+    "workspace end-to-end revalidation",
+    "release/platform matrix",
+    "latency SLO and concurrent/time snapshots"
+  ],
+  "commit": false,
+  "push": false
+}
