@@ -1,5 +1,27 @@
 # Lite benchmark
 
+## 阶段5：运行保护与分入口容量
+
+`npm run test:reliability`独立运行执行/真实进程/报告校验；`npm run test:reliability:soak`运行1000轮、每轮四个Query及周期CAS/幂等重试。原生PG另用一次性Docker夹具补验，不替代pg-mem质量指标。`eval:reliability:faults -- --source=<before> --output=<new-file>`对相同未结束驱动测四次请求及迟到后读取数量；不能用该机制结果冒充真实SQL硬取消。
+
+`npm run eval:reliability -- --source=<before> --report-dir=<new-dir>`与当前`--compare=<before>/raw-report.json`对照：1k/10k、三轮、短/长值、提供并发1/4，Recall/Context/Query各自10次预热、100响应采样，共72行/7200响应。SQLite是同步单进程，不是SQL并行。原始响应投影、全部延迟、P50/P95/P99/max、busy/timeout/failed/invalid、让出延迟及RSS采样分开保存。禁止用总valid或RSS采样冒充语义质量/内存峰值。
+
+正式测量前固定工程门禁：每workload三轮P95中位数≤参考中位数×1.5+0.5ms，少于三轮标未建立，不能事后调低阈值或删慢样本。它不是生产SLO；旧benchmark:lite及公共quality/baseline独立保留。完整网格、计数、原响应期望及百分位重算由测试校验；报告目录不覆盖旧证据。详见[5C设计](./retrieval-core/phase-5c-observability.md)。
+
+## 阶段4B/4C：预算覆盖与证据答复专项
+
+`npm run eval:answer -- --report-dir=<new-dir>` 独立输出quality/citations/security/stability/latency/packing-ablation及raw-report。10个完全虚构场景 × 四存储 × 三次重建形成120行，每题预热1次后同库重复5次；不是120个独立问题。固定预期覆盖无证据、超预算、部分/完整多问题、最小数量、显式冲突、历史未投影、权限确认及原值否定/条件。引用必须对齐实际Context的memory/event/version并重算hash，不用模型或新标注替代旧检索成绩。
+
+faithfulness只报原值投影忠实性；语义生成回答的faithfulness、引用来源认证和模型prompt-injection抵抗均未实现/未评估。coverage只表示字面子查询匹配，不是语义answerability。packing-ablation用相同候选比较query_coverage/rank_only，保留预算覆盖失败；不称全局最优。安全分母按禁止夹具分别报告，原生PG工程与pg-mem质量分开。原public baseline/quality-v1失败仍保留，容量性能与Query新链路另测，不用小夹具延迟或benchmark:lite的普通Context代替Query性能。
+
+`eval:answer -- --report-dir=<new-dir> --capacity`额外测SQLite 1k/10k干扰记录加两个独立主题的端到端Query（预算覆盖+引用），每容量三次建库，每操作预热10次后采样100次，原始延迟/P50/P95/P99/max及响应校验单独输出capacity.json。它与旧benchmark:lite是不同workload，不能互换数字；没有SLO或提速声明。
+
+## 4A：Context选择机制
+
+`npm run eval:context -- --report-dir=<new-dir>` 独立输出 quality/ablation/stability/latency JSON。8个固定虚构证据矩阵、每题5次技术重复，比较相同候选下的默认 relevance_first、禁用用途的 relevance_only 与旧 legacy_weighted。评分遵循事先写明的层级/名次约束，机制误选率不是实际查询的语义false injection；所有消融失败保留。`--source=<clean-before>` 可用同一评测器测旧实现，新增契约在旧实现不通过不是线上缺陷数量。
+
+原公共质量仍由冻结标注的 `eval:baseline -- --compare=<before>/raw-report.json` 单独衡量，不能用机制8/8替代Recall/MRR、miss或false injection。跨存储接入测试与原生PG工程分别记录。小夹具延迟不代表容量或SLO，`benchmark:lite` 前后用相同源码基线/锁文件/机器/参数独立运行，保留慢样本。4A首次验收时未包含4B预算后覆盖与4C引用；当前两者已单独实现，结果见上方4B/4C报告，原值投影忠实性不等于模型语义faithfulness。
+
 ## 3C：显式事实专项与成本
 
 `npm run eval:facts -- --report-dir=<new-dir> --capacity` 在独立 `fact-v1` 虚构声明夹具上输出 quality/security/stability/latency/raw-report 与可选 capacity，四存储与 Recall/Context 分开。8 个不同样例、3 次重建、5 次重复形成 192 行，不是 192 个独立问题。字面冲突、有效期、明确替代、原查询不匹配替代者、可见分区和旧数据控制各有固定标注；不改 `quality-v1` 或 `core-baseline-v1` 的原有失败。

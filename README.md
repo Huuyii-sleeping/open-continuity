@@ -6,13 +6,19 @@ Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不
 
 当前发布候选为 `1.1.0-beta.1`，定位是 Developer Preview：Lite 本地闭环已可验证，Team 是实现预览，Enterprise 尚未实现。
 
+[阶段5运行可靠性](docs/retrieval-core/phase-5-runtime-reliability.md) 增加每个MemoryService的共享单调deadline、无队列读准入及未结束读取容量保护；超时不再继续新读取，普通读返回`READ_TIMEOUT`，Query保留明确超时/abstain。默认最多16个读请求、8个未结束Store读取，满载返回`RUNTIME_BUSY`；关闭有界drain。同步SQLite仍不能硬取消，身份/scope/确认不变；真实进程恢复、持续Query和容量报告独立验证，不是断电安全、语义增强或生产SLO承诺。
+
+[阶段4 Context与证据答复](docs/retrieval-core/phase-4-context-and-answer.md) 已实现确定性4A–4C范围：相关性优先选择、Query预算内覆盖、预算后充分性，以及带确切版本引用的原值结构化`answer`。`memory_query.sufficiency`现在依据实际Context，旧召回口径保留在`retrievalSufficiency`；无可用正文时`answer.status=abstain`。`evidence_ready`只表示字面匹配证据契约就绪，不表示语义上已回答；无外部模型、自由文本总结或客观真伪认证，历史仍为审计元数据。
+
+[4A 上下文选择](docs/retrieval-core/phase-4a-context-selection.md) 使用 `context-selection-v2`：默认 Exact 层级与检索分数优先，用途只在完全同分时破平，scope/用户确认不加相关性分。Core 可显式配置 `relevance_only` 消融或 `legacy_weighted` 旧排序兼容。普通Context仍按该顺序与原预算装包；多查询Query由4B覆盖优先装包，可明确改变消费顺序以保留不同子问题的证据。默认顺序及 `priority` 单位有变化，详见[兼容性](docs/compatibility.md)。
+
 内核按阶段推进；[可执行基线与独立报告](docs/retrieval-core/baseline-framework.md) 分开展示召回、Context、安全、稳定性、容量性能和工程验证。运行 `npm run eval:baseline -- --report-dir=/tmp/core-baseline-run --capacity`；报告保留失败样例与未验证项，不提供综合总分。
 
 阶段 1 引入独立的结构化存储契约，统一幂等、版本、对象副本与游标过滤绑定；参见 [存储阶段实现与验收](docs/retrieval-core/phase-1-storage.md)。普通 Recall/History 的旧游标需从第一页重新开始。
 
 [阶段 2](docs/retrieval-core/phase-2-candidates.md) 建立 `CandidateRetrieval` / `searchCandidates`：Exact、Structured、Lexical 独立返回候选与匹配证据；SQLite 使用原生 BM25 和确定性短查询 fallback，其它存储如实保留 substring 兼容能力。
 
-[阶段 3 首个增量](docs/retrieval-core/phase-3-ranking.md) 已将四个内置存储的候选接入公共 Recall、Context、Query。单通道保留原生顺序，多通道融合真实排名；精确 key 优先，结构化资格贡献为 0。回执保留原始分数、排名、融合贡献和选择原因；排序版本与策略绑定检索游标，旧查询游标需重启。当前版本链与混合快照校验已覆盖，不同 key 的事实冲突仍为 challenge。Context 保留既有用途/预算策略；无 embedding、模型或新 Adapter。结果见[本轮验证](docs/retrieval-core/phase-3-validation.md)。
+[阶段 3 首个增量](docs/retrieval-core/phase-3-ranking.md) 已将四个内置存储的候选接入公共 Recall、Context、Query。单通道保留原生顺序，多通道融合真实排名；精确 key 优先，结构化资格贡献为 0。回执保留原始分数、排名、融合贡献和选择原因；排序版本与策略绑定检索游标，旧查询游标需重启。当前版本链与混合快照校验已覆盖，未声明关系的跨 key 事实冲突仍为 challenge。阶段3交付时的Context加权由4A独立策略接管，预算不变；无 embedding、模型或新 Adapter。结果见[历史验证](docs/retrieval-core/phase-3-validation.md)。
 
 [3C 显式事实裁决](docs/retrieval-core/phase-3c-fact-design.md) 在上述排名之后核实调用方声明的事实组、有效期与精确替代版本。声明需要 `userConfirmed` 与 `expectedVersion`；冲突、引用未核实或组被截断时省略并返回 `factReview`，不按更新时间猜赢家，也不把不匹配 query 的替代者补成答案。旧记忆无声明时保持兼容且标记未验证；原跨 key 语义 challenge 不改标注。SQL 自动迁移新增事实列/组索引；升级前必须备份，早期运行时可能打开新版数据库却忽略事实字段，不得用于升级后的数据库。含声明的 JSON ledger v2、Memory Package 1.1 也不能交给旧读取器，详见[兼容性](docs/compatibility.md)。
 
@@ -467,11 +473,11 @@ V0.8 使用确定性的 `utf8_bytes_v1` 估算，即 UTF-8 字节数除以 4 后
       "minEvidence": 2
     }
 
-响应包含 `plan`、逐步 `steps`、去重融合后的 `evidence`、可直接消费的 `contextPack`、`sufficiency`、实际执行预算以及 `fallback`。复杂度分为 L0-L3：L0 是显式 key，L1 是单次混合检索，L2 是多子查询或历史扩展；L3 表示需要关系或语义多跳，V1.0 只做尽力召回并返回 `unsupported_complexity`，不会声称已经完成图谱推理。
+响应包含 `plan`、逐步 `steps`、去重融合后的 `evidence`、带覆盖回执的 `contextPack`、预算后的 `sufficiency`、独立 `retrievalSufficiency`、原值/版本引用的 `answer`、实际执行预算以及 `fallback`。复杂度分为 L0-L3：L0 是显式 key，L1 是单次混合检索，L2 是多子查询或历史扩展；L3 表示需要关系或语义多跳，当前只做尽力召回并返回 `unsupported_complexity`，不会声称已经完成图谱推理。
 
 规划器是 `deterministic_v1`。显式 `subqueries` 最可靠；自动拆分只识别有限的中英文连接词。`direct` 强制只执行一次 recall，不能与 `includeHistory=true` 同用。显式子查询超过当前 Profile 上限会返回 `VALIDATION_ERROR`，自动拆分超限会截断并返回 `subquery_limit`。历史扩展按排名靠前的候选 memoryId 定向读取，最多展开 `maxSubqueries` 个候选，并共享当前 Profile 的历史事件预算；发生截断时会标记 `history_limit` 和 `history.truncated=true`。整体超时基于 `Promise.race`：结果会停止等待并确定性降级，但底层只读数据库调用无法被强制取消，其迟到结果会被忽略。
 
-`sufficiency.status` 的语义是：`sufficient` 表示查询覆盖、最小证据、历史要求和执行预算全部满足；有部分证据时为 `partial`；完全没有证据时为 `insufficient`。无论走几步，scope、task、Agent 私有范围和 private 策略都不会被放宽。
+`sufficiency.status`现在依据实际Context：`sufficient`表示字面子查询覆盖、最小证据及执行契约满足，不表示语义答案已正确；有部分可用证据时为`partial`，没有可用正文时为`insufficient`。旧召回口径见`retrievalSufficiency`。`answer`只投影实际入选原值，`evidence_ready/partial/abstain`配合确切版本引用；历史仍仅有审计元数据，没有生成时间线，所以答复层标partial。所有scope、task、Agent私有范围和private策略不放宽。
 
 ## 记忆演化契约
 

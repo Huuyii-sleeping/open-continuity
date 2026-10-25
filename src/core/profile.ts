@@ -1,10 +1,13 @@
 import { OpenContinuityError } from "../shared/errors.js";
 import type { RetrievalChannel } from "../shared/types.js";
 import type { ContextPackPolicy } from "./context-pack.js";
+import { CONTEXT_SELECTION_VERSION, resolveContextPackPolicy } from "./context-selection.js";
+import type { ContextSelectionMode } from "../shared/types.js";
 import type { AgenticQueryPolicy } from "./agentic-query.js";
 import type { StorageKind } from "./store-factory.js";
 import { OPEN_CONTINUITY_VERSION } from "../version.js";
 import type { MemoryService } from "./memory-service.js";
+import type { ReadRuntime } from "./read-runtime.js";
 
 export type RuntimeProfile = "lite" | "team" | "enterprise";
 
@@ -24,6 +27,7 @@ export interface RuntimeProfileConfig {
 }
 
 export interface RuntimeCapabilities {
+  readRuntime?: ReturnType<ReadRuntime["capabilities"]>;
   version: typeof OPEN_CONTINUITY_VERSION;
   profile: RuntimeProfileConfig["name"] | "development";
   storage: StorageKind | "memory";
@@ -69,11 +73,22 @@ export interface RuntimeCapabilities {
     maxMemories: number;
     estimation: "utf8_bytes_v1";
     overflow: "omit_whole_memory";
+    selectionVersion: "context-selection-v2";
+    selectionMode: ContextSelectionMode;
+    purposePreference: "exact_score_tie_only" | "disabled" | "legacy_additive";
+    scopeBoostMax: number;
+    confirmationBoost: number;
+    requireUserConfirmed: boolean;
+    missingScoreFallback: "preserve_input_order" | "legacy_zero_score";
+    queryPacking: "query_coverage" | "rank_only";
+    coverageVersion: "context-coverage-v1";
   };
   agenticQuery: {
     enabled: true; planner: "deterministic_v1"; supportsExplicitSubqueries: true; supportsHistoryEvidence: true;
     defaultMaxSteps: number; maxSteps: number; defaultTimeoutMs: number; maxTimeoutMs: number; maxSubqueries: number; historyLimit: number;
     semanticPlanner: false; graphTraversal: false;
+    sufficiency: "budgeted-context-v1";
+    answer: { version: "evidence-answer-v1"; mode: "memory_projection"; semanticSynthesis: false; versionCitations: true; historyProjection: false };
   };
   handoff: { enabled: true; schemaVersion: "1.0"; expiration: true };
   deployment: { localOnly: boolean; multiProcess: true; multiInstance: boolean };
@@ -170,6 +185,7 @@ export function capabilitiesForProfile(config: RuntimeProfileConfig): RuntimeCap
       maxMemories: config.contextPack.maxMemories,
       estimation: "utf8_bytes_v1",
       overflow: "omit_whole_memory",
+      ...contextSelectionCapabilities(config.contextPack),
     },
     agenticQuery: {
       enabled: true, planner: "deterministic_v1", supportsExplicitSubqueries: true, supportsHistoryEvidence: true,
@@ -177,22 +193,41 @@ export function capabilitiesForProfile(config: RuntimeProfileConfig): RuntimeCap
       defaultTimeoutMs: config.agenticQuery.defaultTimeoutMs, maxTimeoutMs: config.agenticQuery.maxTimeoutMs, maxSubqueries: config.agenticQuery.maxSubqueries,
       historyLimit: config.agenticQuery.historyLimit,
       semanticPlanner: false, graphTraversal: false,
+      sufficiency: "budgeted-context-v1",
+      answer: { version: "evidence-answer-v1", mode: "memory_projection", semanticSynthesis: false, versionCitations: true, historyProjection: false },
     },
     handoff: { enabled: true, schemaVersion: "1.0", expiration: true },
     deployment: { localOnly: config.name === "lite", multiProcess: true, multiInstance: config.name === "team" },
   };
 }
 
+function contextSelectionCapabilities(input: ContextPackPolicy) {
+  const policy = resolveContextPackPolicy(input);
+  const purposePreference: RuntimeCapabilities["contextPack"]["purposePreference"] = policy.selectionMode === "legacy_weighted"
+    ? "legacy_additive" : policy.selectionMode === "relevance_only" ? "disabled" : "exact_score_tie_only";
+  const missingScoreFallback: RuntimeCapabilities["contextPack"]["missingScoreFallback"] = policy.selectionMode === "legacy_weighted"
+    ? "legacy_zero_score" : "preserve_input_order";
+  return { selectionVersion: CONTEXT_SELECTION_VERSION, selectionMode: policy.selectionMode, purposePreference,
+    scopeBoostMax: policy.selectionMode === "legacy_weighted" ? 20 : 0,
+    confirmationBoost: policy.selectionMode === "legacy_weighted" ? 10 : 0,
+    requireUserConfirmed: policy.requireUserConfirmed, missingScoreFallback,
+    queryPacking: policy.queryPacking, coverageVersion: "context-coverage-v1" as const };
+}
+
 /** Discovery reflects actual service policy; a profile is not a legacy provider's proof of support. */
 export function capabilitiesWithServiceSupport(capabilities: RuntimeCapabilities, service: MemoryService): RuntimeCapabilities {
-  const facts = service.supportsFactDeclarations(), policy = service.retrievalCapabilityPolicy();
+  const facts = service.supportsFactDeclarations(), policy = service.retrievalCapabilityPolicy(), context = service.contextCapabilityPolicy();
   return { ...capabilities,
+    readRuntime: service.readRuntimeCapabilities(),
+    agenticQuery: { ...capabilities.agenticQuery, ...service.queryCapabilityPolicy() },
     memory: { ...capabilities.memory, evolution: { ...capabilities.memory.evolution, factDeclarations: facts ? "explicit_v1" : false } },
     retrieval: { ...capabilities.retrieval, channels: policy.channels, candidateLimit: policy.candidateLimit, rrfK: policy.rrfK,
       rankingVersion: policy.scored ? "core-ranking-v2" : null,
       fullTextRanking: policy.scored ? capabilities.retrieval.fullTextRanking : "unverified",
       structuredContribution: policy.scored ? 0 : null, exactPrecedence: policy.scored ? policy.exactPrecedence : null,
-      factPolicy: facts ? "explicit-facts-v1" : null, factGroupLimit: facts ? policy.factGroupLimit : 0 } };
+      factPolicy: facts ? "explicit-facts-v1" : null, factGroupLimit: facts ? policy.factGroupLimit : 0 },
+    contextPack: { ...capabilities.contextPack, ...contextSelectionCapabilities(context), defaultTokenBudget: context.defaultTokenBudget,
+      maxTokenBudget: context.maxTokenBudget, maxMemories: context.maxMemories } };
 }
 
 export function developmentCapabilities(): RuntimeCapabilities {

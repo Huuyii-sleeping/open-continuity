@@ -247,17 +247,42 @@ export interface RecallResult {
 }
 export interface HistoryResult { events: MemoryEvent[]; nextCursor: string | null; }
 export type ContextSelectionReason = "retrieval_exact" | "retrieval_structured" | "retrieval_full_text" | "task_scope" | "agent_scope" | "user_confirmed" | `purpose_${ContextPurpose}`;
+export type ContextSelectionMode = "relevance_first" | "relevance_only" | "legacy_weighted";
+export interface ContextSelectionSignal {
+  inputRank: number; exactTier: number; retrievalScore: number | null;
+  scoreModel: NonNullable<MemoryRetrieval["scoreModel"]> | "legacy_positional" | null;
+  purposePreference: number;
+}
+export interface ContextSelectionReceipt {
+  version: "context-selection-v2"; mode: ContextSelectionMode;
+  order: "exact_score_purpose_updated_id" | "exact_score_updated_id" | "input_order" | "legacy_weighted";
+  priorityModel: "retrieval_score" | "input_position" | "legacy_weighted";
+  purposePreferenceMax: number; scopeBoostMax: number; confirmationBoost: number;
+  fallbackReason: "missing_retrieval_score" | null;
+  inputCount: number; eligibleCount: number; confirmationFilteredCount: number;
+}
 export interface ContextPackItem {
   memoryId: string; key: string; value: unknown; kind: MemoryKind; scope: MemoryScope; taskId?: string;
   estimatedTokens: number; priority: number; reasons: ContextSelectionReason[]; sourceEventId: string; sourceAgentId: string; updatedAt: string; version: number; supersedes?: MemorySupersedes; confidence?: MemoryConfidence;
   retrieval?: MemoryRetrieval;
   fact?: MemoryFact;
+  selection?: ContextSelectionSignal;
 }
 export interface ContextPackOmission { memoryId: string; key: string; estimatedTokens: number; reason: "token_budget" | "max_memories" | "fact_unresolved"; }
+export interface ContextCoverageRequirement { id: string; query: string; memoryIds: string[]; }
+export interface ContextCoverage {
+  version: "context-coverage-v1"; policy: "rank_only" | "query_coverage";
+  meaning: "lexical_query_matches_not_semantic_answerability";
+  requirements: Array<{ id: string; query: string; retrievedCount: number; selectedMemoryIds: string[];
+    status: "covered" | "missing"; reason: "selected_match" | "no_retrieved_match" | "context_budget" | "fact_unresolved" | "confirmation_required" | "execution_timeout" }>;
+  coveredQueries: number; totalQueries: number; duplicatesRemoved: number;
+}
 export interface ContextPackResult {
   context: string; items: ContextPackItem[]; omitted: ContextPackOmission[];
   budget: { requestedTokens: number; usedTokens: number; remainingTokens: number; maxMemories: number; estimation: "utf8_bytes_v1" };
   retrieval?: RecallResult["retrieval"];
+  selection?: ContextSelectionReceipt;
+  coverage?: ContextCoverage;
 }
 export interface AgenticQueryPlanStep { id: string; type: "recall" | "history"; query?: string; reason: string; }
 export interface AgenticQueryStepReceipt extends AgenticQueryPlanStep {
@@ -272,7 +297,27 @@ export interface AgenticQueryResult {
   plan: { id: string; complexity: QueryComplexity; strategy: Exclude<QueryStrategy, "auto">; rationale: string[]; steps: AgenticQueryPlanStep[] };
   steps: AgenticQueryStepReceipt[]; evidence: AgenticEvidence[]; contextPack: ContextPackResult;
   sufficiency: { status: "sufficient" | "partial" | "insufficient"; matchedQueries: number; totalQueries: number; evidenceCount: number; reasons: string[] };
+  retrievalSufficiency?: AgenticQueryResult["sufficiency"];
+  sufficiencyVersion?: "budgeted-context-v1";
+  answer?: EvidenceAnswer;
   execution: { maxSteps: number; completedSteps: number; timeoutMs: number; elapsedMs: number; stoppedReason: "completed" | "max_steps" | "timeout" };
   factReview?: NonNullable<RecallResult["retrieval"]>["factReview"];
   fallback: { used: boolean; reasons: Array<"unsupported_complexity" | "subquery_limit" | "history_limit" | "max_steps" | "timeout" | "insufficient_evidence">; mode: "deterministic" };
+}
+export interface EvidenceCitation {
+  id: string; memoryId: string; sourceEventId: string; version: number; sourceAgentId: string;
+  contentHash: string; hashModel: "sha256-json-projection-v1";
+}
+export interface EvidenceStatement {
+  citationId: string; key: string; value: unknown; kind: MemoryKind; scope: MemoryScope; taskId?: string;
+  fact?: MemoryFact; userConfirmed: boolean;
+  verification: "visible_explicit_assertion" | "unverified_memory";
+}
+export interface EvidenceAnswer {
+  version: "evidence-answer-v1"; mode: "memory_projection";
+  status: "evidence_ready" | "partial" | "abstain";
+  statements: EvidenceStatement[]; citations: EvidenceCitation[];
+  coverage: ContextCoverage;
+  reasons: string[];
+  limitations: Array<"no_semantic_synthesis" | "not_truth_verification" | "history_not_projected">;
 }

@@ -8,7 +8,7 @@ Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不
 
 ### 当前主线（V1.2 前置实验）
 
-三种 Adapter 维持既有边界；当前按阶段优化 Retrieval Core，阶段 0 建立基线，阶段 1 加固存储，阶段 2 交付候选召回，阶段 3 首个增量将候选接入公共检索与可解释融合：
+三种 Adapter 维持既有边界；Retrieval Core按阶段推进：0基线、1可信存储、2候选召回、3排名/显式事实、4预算Context/原值引用、5运行可靠性。阶段5不增加Embedding或模型，而是验证执行预算、并发恢复及容量成本：
 
 ```text
 Agent runtime -> Capture Adapter -> Conversation Inbox
@@ -34,6 +34,12 @@ RAG、Agentic Retrieval、多路召回和图谱只是 Read Pipeline 的可插拔
 内核阶段文档见 [入口](./retrieval-core/README.md)、[基线](./retrieval-core/baseline-framework.md)、[阶段 1](./retrieval-core/phase-1-storage.md)、[阶段 2](./retrieval-core/phase-2-candidates.md)、[阶段 3 排名](./retrieval-core/phase-3-ranking.md)与[3C 显式事实](./retrieval-core/phase-3c-fact-design.md)。默认公共文本查询已接入四个内置 Store 的候选：SQLite BM25 原生顺序、exact 优先与真实通道排名融合，Structured 仅资格证据。旧自定义 Store/检索器继续明确使用 legacy 兼容路径。显式事实组/有效期/替代版本可保守核实，未声明的语义冲突仍为 Challenge；此前 Spike 仍在备份，不混回本实现。
 
 ### 当前 Developer Preview 已实现
+
+- [阶段5运行保护](./retrieval-core/phase-5-runtime-reliability.md)：MemoryService共享单调deadline，默认16读请求/8未结束读取，无队列满载拒绝；迟到驱动工作保留槽位并停止后续读取。普通读明确504超时/503忙碌，Query保留超时证据状态；关闭drain、可选脱敏observer、真实进程和分入口容量测试。不是SQL硬取消、所有读快照一致、断电认证或生产SLO。
+
+- [阶段4B/4C](./retrieval-core/phase-4-context-and-answer.md)：Query按预算装入不同子查询证据，sufficiency基于实际Context，原召回口径独立保留；原值结构化answer具备确切版本/内容指纹引用与partial/abstain。不生成语义答案，历史只保留审计元数据，语义问答/真伪判断仍未实现。
+
+- [4A Context选择](./retrieval-core/phase-4a-context-selection.md)：默认相关性/Exact层级优先，用途仅同分破平；scope/确认保持资格边界，独立策略和fallback回执可审计。旧加权仅显式兼容；多查询的覆盖装包由4B另外控制，不冒充相关性分数。
 
 - MCP stdio 与 HTTP 两种接入方式。
 - `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`、`memory_handoff_create`、`memory_handoff_resume` 九个工具。
@@ -210,7 +216,7 @@ Inbox 保存“用于判断什么值得沉淀的可观测证据”，长期记�
 
 ### 5.3 面向 Agent 的 Context Pack
 
-同一事实层可以按 Agent 能力、任务类型和 token 预算产生不同结果：编码 Agent 优先获得仓库约束，浏览器 Agent 优先获得操作偏好。Context Pack 只改变呈现和排序，不绕过 scope 或权限。
+同一事实层可以按任务类型和 token 预算产生不同结果。4A 默认先尊重 Exact层级和检索分数，编码/浏览用途只在完全同分时提供偏好，不以scope或确认状态把低相关内容推到前面。旧加权是显式兼容选项，不绕过scope或权限；模型语义压缩仍未实现。
 
 ### 5.4 可解释的检索回执
 
@@ -304,7 +310,16 @@ memory-package/
 
 3C 的边界：同一 group 还必须同 user/scope/task或Agent/kind；private、确认和显式过滤先约束证据。单一/相同字面值只代表可见声明，不是权威真相。引用未知版本、循环、组预算耗尽均返回不确定性。补充读取只核实，不替代相关性召回；Query 在总 deadline 内最终核实累计声明。Context/Answer 的消费重排仍归阶段 4。
 
+### Retrieval Core 阶段5：运行可靠性
+
+- 5A共享执行预算/读准入/迟到工作容量；普通查询错误不伪装未命中，Query超时正文为空。
+- 5B复用事务/CAS/幂等/备份，新增实际COMMIT边界进程退出、四进程冲突、写期间Query引用、持续运行和原生PG慢查询证据。
+- 5C按SQLite容量/值长/提供并发度分别保留Recall、Context、Query响应与原延迟；固定同主机工程回归规则，不建立跨机器生产SLO。
+- SQLite保留同步实现、schema/tokenizer/排序不变；PostgreSQL默认工厂限定pool获取/server statement/lock等待，自定义Pool自行负责。Adapter/Capture/Injection/CLI配置不改，JSON兼容边界不变。
+
 ### V0.7：Profile Runtime（已实现）
+
+以下基础版本保持；4A的选择由独立策略接管，4B/4C新增预算覆盖及可引用原值证据。当前Query充分性评价实际Context，旧召回口径独立保留；它仍不证明语义可回答性，历史未投影时答复为partial。见[阶段4](./retrieval-core/phase-4-context-and-answer.md)。
 
 - `OPEN_CONTINUITY_PROFILE=lite|team|enterprise` 配置入口。
 - Lite 默认 SQLite、每通道 50 个候选；Team 默认 PostgreSQL、每通道 100 个候选。

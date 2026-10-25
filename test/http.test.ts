@@ -5,6 +5,34 @@ import { buildHttpApp } from "../src/http/app.js";
 import { InMemoryStore } from "../src/core/memory-store.js";
 
 describe("HTTP API", () => {
+  it("returns budgeted sufficiency and only selected version citations through Query", async () => {
+    const app = buildHttpApp(); await app.ready();
+    try {
+      const actor = { userId: "fictional-budget-http", agentId: "fictional-budget-reader" };
+      await app.inject({ method: "POST", url: "/v1/memories", payload: { ...actor, key: "needle", value: "fictional needle " + "x".repeat(3000), kind: "decision", idempotencyKey: "fictional-long-http" } });
+      const response = await app.inject({ method: "POST", url: "/v1/query", payload: { ...actor, query: "needle", tokenBudget: 64 } });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ sufficiencyVersion: "budgeted-context-v1", retrievalSufficiency: { status: "sufficient" },
+        sufficiency: { status: "insufficient", evidenceCount: 0 }, answer: { version: "evidence-answer-v1", status: "abstain", statements: [], citations: [] } });
+      const ready = await app.inject({ method: "POST", url: "/v1/query", payload: { ...actor, query: "needle", tokenBudget: 4096 } });
+      expect(ready.statusCode).toBe(200);
+      expect(ready.json().answer).toMatchObject({ status: "evidence_ready", citations: [expect.objectContaining({ version: 1, sourceEventId: expect.any(String), contentHash: expect.any(String) })] });
+      expect((await app.inject({ method: "GET", url: "/v1/capabilities" })).json().agenticQuery).toMatchObject({ sufficiency: "budgeted-context-v1", answer: { versionCitations: true, semanticSynthesis: false } });
+    } finally { await app.close(); }
+  });
+  it("reports the actual context strategy, confirmation policy and budgets", async () => {
+    const service = new MemoryService(new InMemoryStore(), {}, { defaultTokenBudget: 128, maxTokenBudget: 256, maxMemories: 2, requireUserConfirmed: true, selectionMode: "legacy_weighted" });
+    const app = buildHttpApp(service); await app.ready();
+    try {
+      const expected = { selectionVersion: "context-selection-v2", selectionMode: "legacy_weighted", purposePreference: "legacy_additive",
+        requireUserConfirmed: true, defaultTokenBudget: 128, maxTokenBudget: 256, maxMemories: 2, scopeBoostMax: 20, confirmationBoost: 10 };
+      expect((await app.inject({ method: "GET", url: "/v1/capabilities" })).json().contextPack).toMatchObject(expected);
+      expect((await app.inject({ method: "GET", url: "/health" })).json().capabilities.contextPack).toMatchObject(expected);
+      const result = await app.inject({ method: "POST", url: "/v1/context-pack", payload: { userId: "fictional-context-user", agentId: "fictional-context-agent", query: "absent" } });
+      expect(result.statusCode).toBe(200);
+      expect(result.json().selection).toMatchObject({ version: "context-selection-v2", mode: "legacy_weighted" });
+    } finally { await app.close(); }
+  });
   it("reports legacy retrieval honestly and uses actual custom policy budgets", async () => {
     const store = new InMemoryStore();
     const legacy = new MemoryService({ appendRemember: input => store.appendRemember(input),

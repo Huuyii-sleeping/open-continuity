@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-- 当前阶段：**阶段 3 的 3C——显式事实有效性与保守裁决**已完成本地验收。3A/3B 的公共排名与回执保留；未声明的语义关系、来源真实性与性能 SLO 仍未实现，不把基础版等同于完整成熟 RAG。阶段 4 未开始。
+- 当前阶段：**阶段5——运行可靠性已完成本地验收**；5A执行预算/容量，5B进程并发/恢复，5C分入口容量/观测独立实现与验收。阶段4确定性Context/引用保留，不进入Embedding；SQL硬取消、断电、完整身份认证和生产SLO仍未实现。
 - 2026-10-23：[阶段 3 设计](./phase-3-ranking.md) 和 [验证](./phase-3-validation.md)记录新结果；此前 [2C](./phase-2c-validation.md) 为独立候选交付时的历史证据，原数字保留。
 - 基线来源：`core-v2` 分叉点 `e23207aa9e746c71a599af8e2a0c913c5d59bf94`；它是阶段开始时的 `origin/main` 快照。
 - 原 Retrieval Core v2 Spike 已备份并校验后移出当前实现，可恢复，不属于阶段 1 交付。
@@ -12,6 +12,19 @@
 - 阶段运行期间 `origin/main` 已合入 Adapter hardening 并前进到 `9abe30956b67a99ff44fce11713c5838cfa364b0`；阶段 1–3 的历史基线保持原分叉。2026-10-25 的 PR 集成验证基于此已发布主线重新测试，PR 本身不修改 Adapter，也不复制其它工作区的未提交内容。
 
 ## 文档索引
+
+- [阶段5总览](./phase-5-runtime-reliability.md)与[独立验收](./phase-5-validation.md)：执行保护、真实进程及容量成本分开。
+- [5A执行预算](./phase-5a-execution.md)：准入、deadline、迟到工作、错误与drain。
+- [5B并发恢复](./phase-5b-recovery.md)：事务边界退出、幂等/CAS、WAL恢复及持续Query。
+- [5C观测性能](./phase-5c-observability.md)：逐响应证据、固定回归规则和可选脱敏observer。
+
+- [阶段4总览](./phase-4-context-and-answer.md)：选择、预算后覆盖与可引用原值答复，明确非语义问答边界。
+- [阶段4独立验收](./phase-4-validation.md)：三轮公共基线、专项覆盖/引用、原生PG、成本、失败与未实现项。
+- [4B预算与覆盖](./phase-4b-budget-and-coverage.md)：多查询装包、缺口、双口径充分性与完整值保留。
+- [4C证据答复](./phase-4c-evidence-answer.md)：statements/版本引用、partial/abstain、一致性校验与专项评测。
+
+- [4A Context选择](./phase-4a-context-selection.md)：默认相关性优先、用途同分破平、旧排序兼容、权限/确认边界与回执。公共质量、机制消融、性能与工程分开验收。
+- [4A独立验收](./phase-4a-validation.md)：同依赖基线的三轮比较、机制消融、工程/原生PG、性能与未完成项。
 
 - [阶段 3 公共排名](./phase-3-ranking.md)：原始分数/融合、Exact 优先、Structured 零贡献、查询游标和版本一致性。
 - [阶段 3 验证](./phase-3-validation.md)：阶段 2 复测、公共质量前后对比、消融、性能和剩余工作。

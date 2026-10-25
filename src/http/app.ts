@@ -35,7 +35,7 @@ export function buildHttpApp(service = new MemoryService(), policy = new AccessP
   });
   app.get("/health", async () => ({ ok: true, service: "open-continuity", version: capabilities.version, profile: capabilities.profile, storage: capabilities.storage, capabilities }));
   app.get("/v1/capabilities", async () => capabilities);
-  app.addHook("onClose", async () => { await service.close(); });
+  app.addHook("onClose", async () => { await service.closeGracefully(); });
   app.post("/v1/memories", async (request, reply) => {
     try {
       const input = rememberInputSchema.parse(request.body) as RememberInput;
