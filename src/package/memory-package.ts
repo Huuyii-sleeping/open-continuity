@@ -4,9 +4,9 @@ import { basename, dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import { OpenContinuityError } from "../shared/errors.js";
 import { memoryEventSchema, type MemoryEvent } from "../shared/types.js";
-import { SqliteMemoryStore } from "../sqlite/sqlite-memory-store.js";
+import { SqliteMemoryStore } from "../storage/sqlite/sqlite-memory-store.js";
 import { OPEN_CONTINUITY_VERSION } from "../version.js";
-import { memoryIdentity } from "../core/storage-contract.js";
+import { memoryIdentity } from "../core/memory/storage-contract.js";
 
 const PACKAGE_VERSION = "1.0";
 const manifestSchema = z.object({

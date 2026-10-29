@@ -1,5 +1,5 @@
-import { MemoryService } from "../../src/core/memory-service.js";
-import { JsonFileStore } from "../../src/core/memory-store.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
+import { JsonFileStore } from "../../src/storage/json/store.js";
 
 const filePath = process.env.OPEN_CONTINUITY_TEST_FILE;
 const index = process.env.OPEN_CONTINUITY_TEST_INDEX;

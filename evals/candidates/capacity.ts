@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { performance } from "node:perf_hooks";
 import { recallInputSchema } from "../../src/shared/types.js";
-import type { CandidateSearchRequest } from "../../src/core/candidate-search.js";
+import type { CandidateSearchRequest } from "../../src/core/retrieval/contracts.js";
 import { sourceEvidence } from "../baseline/evaluator.js";
 import { latencySummary } from "../baseline/metrics.js";
 import { candidateRuntime } from "./runtime.js";

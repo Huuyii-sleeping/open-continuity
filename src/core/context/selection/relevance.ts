@@ -1,0 +1,2 @@
+import type { SelectedContextCandidate } from "../contracts.js";
+export function orderByRelevance(ranked: SelectedContextCandidate[]): void { ranked.sort((a, b) => b.selection.exactTier - a.selection.exactTier || b.selection.retrievalScore! - a.selection.retrievalScore! || b.selection.purposePreference - a.selection.purposePreference || b.memory.updatedAt.localeCompare(a.memory.updatedAt) || b.memory.id.localeCompare(a.memory.id)); }

@@ -1,5 +1,54 @@
 # Lite benchmark
 
+[投影缓存与候选验证验收](./retrieval-core/embedding-optimization-validation.md)按同一事件账本重放各臂，固定 ID、事件、版本、时间戳和正文。质量对照分别显示 Legacy/优化、无验证/有验证，原标注与阈值不变；另禁用判断缓存做三次模型重载。1k/10k 采用新进程三轮交错配对，冷请求、热 P95、主进程峰值和模型进程成本单独报告；不以缓存命中等同模型推理速度。`eval:dense` 可显式追加 `--verifier`、`--dataset`、`--compare-ranking`，没有自动安装或下载。
+
+
+[Embedding 实际接入验收](./retrieval-core/embedding-integration-validation.md)分开报告真实 Core/SQLite 的 OFF、保守 miss-only 与实验 hybrid，以及 Recall/Context/Query 三个出口；quality-v1 和两组既有虚构回归池标注不变，三次固定夹具复查。模型未加载/索引失败会阻止评测，不能当作“无误召回”。1k/10k 完整 Context 成本与单模型成本分开；流式扫描前后的慢结果保留，未通过默认语义质量门禁。复现：`npm run eval:dense -- --provider=<显式本地模块> --output=<仓库外报告>`，不自动安装或下载模型。
+
+## 本地模型加载与文本对验证
+
+[加载优化与验证](./retrieval-core/embedding-hardening.md)以同一固定 q8 embedding 权重、CPU2、每臂新进程/5预热/50样本做三轮前后交错；文件逻辑字节与 RSS/P95 分开，不宣称提速。外置图/权重先核对张量 hash，再做109条 token/向量一致性；未改变学习参数。模型文件校验流式执行，其耗时不算热推理。
+
+文本对验证将原18题验收保留为已暴露回归，新增冻结24题（12正/12负）与原校准分别报告；沿用 Dense 校准值和预定 NLI 阈值，不按验收结果调参。三轮强模型选择稳定，小模型新负例4/12与强模型双驻留约641MiB的失败均保留；原生产评测和权限不受模型实验改变。作者生成的数据不冒充独立盲测；小模型协议/源文件校验通过不等于质量通过，強模型质量通过也不等于个人版资源预算通过。
+
+## 个人版成本与 Dense 准入
+
+[本轮实验](./retrieval-core/embedding-refinement.md)用同一 q8 模型做 native 窄组合的三轮前后交错比较，逻辑文件字节、进程 RSS、冷加载、热请求分开；原始慢样本保留。测量前固定文件/驻留/峰值/延迟预算，驻留预算失败不调整为通过。109 条 token/向量一致性与真实 idle 退出分别记录；WASM 成本失败保留，不混入选定路径。
+
+准入用不同虚构校准/验收池各 18 题，阈值只在校准池拟合并冻结，再跑验收和原 20 题；模型/执行/策略指纹绑定。校准新增 5/11 正例且 0/7 负例，不代表验收通过：新验收仍有 2/7 否定误召回。旧 Required/标注/权限保持，词典与按题规则未加入。纯 Core 决策/生命周期测试与真实模型试验独立；默认 pipeline、模型依赖、schema 不变，Windows/Linux 尚未验证。
+
+## 个人版 Embedding 可行性原型
+
+[独立实验](./retrieval-core/embedding-feasibility.md)分别记录首次安装失败/重试、两个固定多语言 q8 模型的三轮冷加载与短请求、四客户端共用模型、冻结旧题/新增噪声池的 OFF/Dense-only/实验融合，以及 1k/10k 内存向量扫描。模型在仓库外运行，当前生产 pipeline 与标注不变。Recall/MRR 的正例收益与 Required/负例退化同时保留；无相关性阈值的实验融合不通过默认接入标准。进程 RSS 不等于物理独占内存，短模型调用/单轮向量扫描不等于完整 Query 或生产 SLO；Windows/Linux、真实 Hook 和向量版本同步尚未验证。
+
+## 7A：模块化前后行为与成本
+
+[最终详细复测](./retrieval-core/phase-7a-final-audit.md)保留三轮正常/乱序工程结果、专项评测、原公共基线对照、1k/10k三入口并发容量和三轮Lite配对。不同指标与分母分开，消融或可选拼写失败不能因其它门禁通过被隐藏。
+
+最新[线路收尾验收](./retrieval-core/phase-7a-route-completion-validation.md)以本轮开始的7A内部线路交付为Before，沿用原评测器比较和预设性能回归预算；分项工程/职责登记单独报告。原标注、Challenge与默认关闭拼写策略保持。
+
+内部线路补全独立复测，见 [新验收](./retrieval-core/phase-7a-module-routes-validation.md)。以初次7A交付工作区为Before，保持标注/阈值；`test:core`分模块/线路报告工程结果，质量/安全/稳定/性能仍用各自评测命令，不能将测试分组数当作召回收益。
+
+本轮保持算法、标注、阈值和依赖不变。使用本轮开始时完整源码快照与新源码，在同一当前评测器下分别运行 `eval:baseline`、`eval:diagnostics`，再用 `--compare=<before>/raw-report.json` 核对完整网格、各存储/入口及逐题结果。工程门禁、原质量、Challenge、安全、稳定性和性能分开记录；不把测试增加数当作召回提升。
+
+`benchmark:lite` 保持虚构 10k 记忆、100 次请求，串行运行三组前后配对并交替顺序，保留每轮 P50/P95/max 和写入成本。重构观察预算预先设为三轮 P95 中位数 `after ≤ before × 1.25 + 1ms`；这是本机回归检查，不是生产 SLO。拼写消融继续单独运行，默认启用失败不能因重构变为通过。命令、结果、兼容游标与安装包验证见 [7A 验证](./retrieval-core/phase-7a-validation.md)。
+
+## 6B/6C：拼写fallback消融与默认接受
+
+`npm run eval:lexical -- --report-dir=<new-dir>`在同一源码/锁文件/Node/权限/预算下对照OFF与ON。原38题与新增16个已暴露虚构验收题各自保存off/on完整逐层报告和逐题对照；单编辑、字面保护、负例、合法词歧义、语义Challenge与安全分组独立。Recall@1/3/5、MRR、nDCG、miss、false selection仍可重算；负例没有相关标注时Recall/MRR为null，不硬编码通过。
+
+性能单独保存`performance.json`：1k/10k、三轮、20次预热、100正式请求，字面命中/可纠正无字面命中/真正缺失/宽噪声分别测OFF/ON，每次交错执行顺序，P50/P95/P99及原始样本保留。预先固定三轮P95中位数预算`ON≤OFF×2+2ms`，不是跨机器SLO。限100次核验并不限制SQLite内部索引/排序工作。
+
+`decision.json`区分工程完整性/安全与默认开启门禁：命令退出0仅表示有效完成实验，不意味着ON全部质量/成本通过。合法词歧义新增误召回、宽噪声成本失败阻止默认开启；当前默认OFF，旧默认质量不变。当前结果见[阶段6验收](./retrieval-core/phase-6-validation.md)，协议见[6C](./retrieval-core/phase-6c-acceptance.md)。
+
+## 6A：逐层诊断，不改变生产检索
+
+`npm run eval:diagnostics -- --source=<frozen-source> --report-dir=<new-dir>`，再用同评测器`--compare=<before>/raw-report.json`复测。旧core-baseline-v1的20题/相关性等级保持；8个开发题与10个已暴露验收题独立报告。四存储×三入口×三重建=1368行，每行三次技术重复，共4104响应，不是4104个独立问题。固定验收已被实现者看见，不能宣称盲测held-out或真实查询泛化。
+
+实际候选通道与limit100诊断扩窗分开；Recall/Context排名为单独同策略重放，Query排名取实际evidence。扩窗结果不改变正式响应、不提供无限扫描；若仍截断，缺失标记“未观察到”，不假称无匹配。Structured仅资格，不算问题召回。预算省略与干扰项排前可并列归因，不能用预算标签遮蔽排序问题。显式事实拒绝、未声明当前事实、正常权限过滤与越界泄露独立。
+
+报告的diagnosis/candidates/ranking/context/facts/security/stability/latency分别按存储/分区/入口输出；没有综合总分。安全分母0记null/未覆盖。门禁校验全网格、原始版本/值/引用、候选前缀、相关性标注和指标重算；Challenge质量失败保留，不阻断诊断工具正确性，Required/泄露/运行异常/不一致必须阻断。小样例延迟仅描述实际调用（包含离线记录开销，排除后续诊断重放），容量/SLO仍单独验证。
+
 ## 阶段5：运行保护与分入口容量
 
 `npm run test:reliability`独立运行执行/真实进程/报告校验；`npm run test:reliability:soak`运行1000轮、每轮四个Query及周期CAS/幂等重试。原生PG另用一次性Docker夹具补验，不替代pg-mem质量指标。`eval:reliability:faults -- --source=<before> --output=<new-file>`对相同未结束驱动测四次请求及迟到后读取数量；不能用该机制结果冒充真实SQL硬取消。
@@ -82,3 +131,5 @@ The benchmark creates a temporary SQLite database, writes obviously fictional re
 The output reports the platform, architecture, Node.js version, database size, seed throughput, and p50/p95/max latency. Compare results only when the dataset, runtime, hardware, power mode, and storage conditions are comparable.
 
 For a release baseline, record the command and raw JSON in the release notes or CI artifact rather than committing machine-specific results as a universal claim. Performance regressions should be investigated when a repeatable test on the same environment materially changes p95 latency or database growth.
+
+Dense 质量验收在各出口计分前检查每次 Dense 调用，含 Query 最终打包前的调用；推理不可用、索引不完整和 Query deadline 拒绝作为正常负例得分。九项虚构回归与真实模型复测独立保存，涵盖推理失败、正常拒绝、OFF 不加载模型及初始化资源清理。生产 fail-open 和冻结标注/阈值保持。

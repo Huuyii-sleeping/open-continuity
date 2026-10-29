@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { MemoryService } from "../../src/core/memory-service.js";
-import { encodeCursor } from "../../src/core/cursor.js";
-import type { MemoryStore } from "../../src/core/memory-store.js";
-import type { MemoryRepository, StructuredMemoryInput } from "../../src/core/storage-contract.js";
-import { storageFingerprint } from "../../src/core/storage-contract.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
+import { encodeCursor } from "../../src/core/pagination/cursor.js";
+import type { MemoryStore } from "../../src/core/memory/contracts.js";
+import type { MemoryRepository, StructuredMemoryInput } from "../../src/core/memory/storage-contract.js";
+import { storageFingerprint } from "../../src/core/memory/storage-contract.js";
 import { recallInputSchema, type RememberInput } from "../../src/shared/types.js";
 
 export interface StorageRuntime {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { MemoryService } from "../../src/core/memory-service.js";
-import type { MemoryStore } from "../../src/core/memory-store.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
+import type { MemoryStore } from "../../src/core/memory/contracts.js";
 const actor = { userId: "fictional-context-contract-user", agentId: "fictional-context-contract-reader" };
 export function contextSelectionConformance(label: string, create: () => Promise<{ store: MemoryStore }>) {
   describe(`${label}: context selection`, () => {

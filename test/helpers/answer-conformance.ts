@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { MemoryService } from "../../src/core/memory-service.js";
-import type { MemoryStore } from "../../src/core/memory-store.js";
-import { validateEvidenceAnswer } from "../../src/core/evidence-answer.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
+import type { MemoryStore } from "../../src/core/memory/contracts.js";
+import { validateEvidenceAnswer } from "../../src/core/answer/evidence-answer.js";
 const actor = { userId: "fictional-phase4-user", agentId: "fictional-phase4-reader" };
 export function answerConformance(label: string, create: () => Promise<{ store: MemoryStore }>) {
   describe(`${label}: budgeted answers`, () => {

@@ -1,10 +1,11 @@
+import { capabilitiesWithServiceSupport } from "../core/application/capabilities.js";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
-import { MemoryService } from "../core/memory-service.js";
-import { AccessPolicy } from "../core/access-policy.js";
+import { MemoryService } from "../core/application/memory-service.js";
+import { AccessPolicy } from "../core/policy/access-policy.js";
 import { errorResponse, normalizeError } from "../shared/errors.js";
 import { agenticQueryInputSchema, contextPackInputSchema, handoffCreateInputSchema, handoffResumeInputSchema, historyInputSchema, recallInputSchema, rememberInputSchema, type RememberInput } from "../shared/types.js";
-import { capabilitiesWithServiceSupport, developmentCapabilities, type RuntimeCapabilities } from "../core/profile.js";
+import { developmentCapabilities, type RuntimeCapabilities } from "../core/runtime/profile.js";
 
 function requestApiKey(headers: Record<string, unknown>): string | undefined {
   const direct = headers["x-open-continuity-api-key"];

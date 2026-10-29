@@ -20,9 +20,9 @@ try {
   const { values } = parseArgs({ options: { source: { type: "string", default: "." }, "report-dir": { type: "string" }, capacity: { type: "boolean", default: false } }, strict: true });
   if (!values["report-dir"]) throw new Error("New explicit report directory required");
   const source = resolve(values.source!), root = resolve(values["report-dir"]), evidence = sourceEvidence(source);
-  const module = await import(pathToFileURL(join(source, "src/core/memory-service.ts")).href) as typeof import("../../src/core/memory-service.js");
-  const { ContextPackBuilder } = await import(pathToFileURL(join(source, "src/core/context-pack.ts")).href) as typeof import("../../src/core/context-pack.js");
-  const { RetrievalPipeline } = await import(pathToFileURL(join(source, "src/core/retrieval.ts")).href) as typeof import("../../src/core/retrieval.js");
+  const module = await import(pathToFileURL(join(source, "src/core/memory-service.ts")).href) as typeof import("../../src/core/application/memory-service.js");
+  const { ContextPackBuilder } = await import(pathToFileURL(join(source, "src/core/context-pack.ts")).href) as typeof import("../../src/core/context/pack.js");
+  const { RetrievalPipeline } = await import(pathToFileURL(join(source, "src/core/retrieval.ts")).href) as typeof import("../../src/core/retrieval/pipeline.js");
   const { InMemoryStore } = await import(pathToFileURL(join(source, "src/core/memory-store.ts")).href) as typeof import("../../src/core/memory-store.js");
   const packing = packingAblation(mode => new ContextPackBuilder(new RetrievalPipeline(new InMemoryStore()), { defaultTokenBudget: 4096, maxTokenBudget: 4096, maxMemories: 20, queryPacking: mode }));
   const rows = [];

@@ -6,7 +6,7 @@ import { latencySummary } from "../baseline/metrics.js";
 import { actor } from "./dataset.js";
 
 export async function answerCapacity(source: string) {
-  const module = await import(pathToFileURL(join(source, "src/core/memory-service.ts")).href) as typeof import("../../src/core/memory-service.js");
+  const module = await import(pathToFileURL(join(source, "src/core/memory-service.ts")).href) as typeof import("../../src/core/application/memory-service.js");
   const results = [];
   for (const size of [1000, 10000]) for (let round = 1; round <= 3; round++) {
     const rt = await candidateRuntime(source, "sqlite");

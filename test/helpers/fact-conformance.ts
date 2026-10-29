@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MemoryStore } from "../../src/core/memory-store.js";
-import { MemoryService } from "../../src/core/memory-service.js";
+import type { MemoryStore } from "../../src/core/memory/contracts.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
 import type { RememberInput, ResolvedMemory } from "../../src/shared/types.js";
 
 export function factConformance(backend: string, runtime: () => Promise<{ store: MemoryStore; service: MemoryService }>) {

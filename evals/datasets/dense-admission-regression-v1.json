@@ -1,0 +1,515 @@
+{
+  "version": "dense-admission-acceptance-v1",
+  "description": "Entirely fictional author-generated development/independent evaluation split. Frozen before model scores. Not independently sourced/blind holdout.",
+  "corpus": [
+    {
+      "id": "compact",
+      "text": "虚构用户喜欢精炼的任务进展概览。"
+    },
+    {
+      "id": "snapshot",
+      "text": "替换虚构设置文件以前，请保留一份能够还原的副本。"
+    },
+    {
+      "id": "consent",
+      "text": "虚构资料必须经用户批准后才可放入持久记忆。"
+    },
+    {
+      "id": "local",
+      "text": "虚构服务默认离线运行，除非用户选择允许联网。"
+    },
+    {
+      "id": "evidence",
+      "text": "说明虚构设计时，请使用完全编造的案例。"
+    },
+    {
+      "id": "resume",
+      "text": "换一个助手继续虚构任务前，应记录进展、阻碍和下一步。"
+    },
+    {
+      "id": "restore",
+      "text": "If the fictional deployment health check fails, return to the previous release."
+    },
+    {
+      "id": "rust",
+      "text": "The fictional Cedar project uses Rust."
+    },
+    {
+      "id": "folder",
+      "text": "Access for the fictional tool is limited to explicitly allowed directories."
+    },
+    {
+      "id": "receipt",
+      "text": "虚构检索回执只记录指纹和记忆编号，不记录提示词全文。"
+    },
+    {
+      "id": "blue",
+      "text": "虚构实验室使用蓝色标牌。"
+    },
+    {
+      "id": "weekend",
+      "text": "虚构活动安排在星期六傍晚。"
+    },
+    {
+      "id": "pasta",
+      "text": "虚构角色偏爱番茄意面。"
+    },
+    {
+      "id": "email",
+      "text": "虚构程序可以经用户许可发送邮件，但不能默认发送。"
+    },
+    {
+      "id": "long",
+      "text": "虚构法律报告要求逐条列出详细条款。"
+    },
+    {
+      "id": "review",
+      "text": "虚构代码修改必须通过测试后才可发布。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "acc-compact",
+      "category": "semantic",
+      "query": "给我一个简短的工作近况介绍",
+      "relevant": [
+        "compact"
+      ],
+      "forbidden": [
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-snapshot",
+      "category": "semantic",
+      "query": "改设置以前先准备还原用的文件",
+      "relevant": [
+        "snapshot"
+      ],
+      "forbidden": [
+        "compact",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-consent",
+      "category": "semantic",
+      "query": "什么时候能将提取的资料永久保留",
+      "relevant": [
+        "consent"
+      ],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-local",
+      "category": "semantic",
+      "query": "用户没开网络功能时在哪里执行处理",
+      "relevant": [
+        "local"
+      ],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-fiction",
+      "category": "semantic",
+      "query": "讲设计的时候能拿捏造的例子说明吗",
+      "relevant": [
+        "evidence"
+      ],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-resume",
+      "category": "semantic",
+      "query": "换人继续干活前需要记哪些内容",
+      "relevant": [
+        "resume"
+      ],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-revert",
+      "category": "cross_language",
+      "query": "上线健康检查没通过应该恢复到哪一版",
+      "relevant": [
+        "restore"
+      ],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-code",
+      "category": "cross_language",
+      "query": "雪松项目选用什么编程语言",
+      "relevant": [
+        "rust"
+      ],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-folder",
+      "category": "cross_language",
+      "query": "虚构工具是否能读取任意文件夹",
+      "relevant": [
+        "folder"
+      ],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-receipt",
+      "category": "semantic",
+      "query": "回执中会保留用户的完整输入吗",
+      "relevant": [
+        "receipt"
+      ],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-copy-en",
+      "category": "cross_language",
+      "query": "Save a recoverable copy before replacing settings",
+      "relevant": [
+        "snapshot"
+      ],
+      "forbidden": [
+        "compact",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-unknown-salary",
+      "category": "no_evidence",
+      "query": "虚构团队成员的工资是多少",
+      "relevant": [],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-unknown-country",
+      "category": "no_evidence",
+      "query": "虚构用户现在住在哪个国家",
+      "relevant": [],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-unknown-license",
+      "category": "no_evidence",
+      "query": "虚构程序的商业订阅费是多少",
+      "relevant": [],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-negation",
+      "category": "negation",
+      "query": "不要保留能够还原的设置副本",
+      "relevant": [],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-bypass",
+      "category": "negation",
+      "query": "虚构资料未经批准也必须直接写入持久记忆",
+      "relevant": [],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-unknown-token",
+      "category": "no_evidence",
+      "query": "虚构账户的访问密钥是什么",
+      "relevant": [],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    },
+    {
+      "id": "acc-engine",
+      "category": "no_evidence",
+      "query": "虚构飞船的发动机怎么拆卸",
+      "relevant": [],
+      "forbidden": [
+        "compact",
+        "snapshot",
+        "consent",
+        "local",
+        "evidence",
+        "resume",
+        "restore",
+        "rust",
+        "folder",
+        "receipt",
+        "blue",
+        "weekend",
+        "pasta",
+        "email",
+        "long",
+        "review"
+      ]
+    }
+  ]
+}

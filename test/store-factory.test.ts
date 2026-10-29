@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createStoreFromEnv } from "../src/core/store-factory.js";
-import { JsonFileStore } from "../src/core/memory-store.js";
-import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
-import { capabilitiesForProfile, resolveRuntimeProfile } from "../src/core/profile.js";
+import { createStoreFromEnv } from "../src/core/application/store-factory.js";
+import { JsonFileStore } from "../src/storage/json/store.js";
+import { SqliteMemoryStore } from "../src/storage/sqlite/sqlite-memory-store.js";
+import { capabilitiesForProfile, resolveRuntimeProfile } from "../src/core/runtime/profile.js";
 
 describe("store factory", () => {
   it("declares PostgreSQL literal substring fallback without claiming native full-text", () => {

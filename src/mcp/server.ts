@@ -1,10 +1,11 @@
+import { capabilitiesWithServiceSupport } from "../core/application/capabilities.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { AccessPolicy } from "../core/access-policy.js";
-import { MemoryService } from "../core/memory-service.js";
+import { AccessPolicy } from "../core/policy/access-policy.js";
+import { MemoryService } from "../core/application/memory-service.js";
 import { errorResponse } from "../shared/errors.js";
-import { capabilitiesWithServiceSupport, developmentCapabilities, type RuntimeCapabilities } from "../core/profile.js";
+import { developmentCapabilities, type RuntimeCapabilities } from "../core/runtime/profile.js";
 import { OPEN_CONTINUITY_VERSION } from "../version.js";
 import { memoryFactSchema } from "../shared/types.js";
 

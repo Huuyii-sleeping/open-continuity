@@ -1,4 +1,4 @@
-import type { ContextPackBuilder } from "../../src/core/context-pack.js";
+import type { ContextPackBuilder } from "../../src/core/context/pack.js";
 import type { ContextCoverageRequirement, ResolvedMemory } from "../../src/shared/types.js";
 import { actor } from "./dataset.js";
 function memory(id: string, score: number, value = "fictional evidence"): ResolvedMemory {

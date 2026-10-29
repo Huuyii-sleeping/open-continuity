@@ -11,7 +11,7 @@ try {
   const { values } = parseArgs({ options: { source: { type: "string", default: "." }, output: { type: "string" } }, strict: true });
   if (!values.output) throw new Error("Explicit new report path required");
   const source = resolve(values.source!);
-  const module = await import(pathToFileURL(join(source, "src/core/memory-service.ts")).href) as typeof import("../../src/core/memory-service.js");
+  const module = await import(pathToFileURL(join(source, "src/core/memory-service.ts")).href) as typeof import("../../src/core/application/memory-service.js");
   let release!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
   let reads = 0;

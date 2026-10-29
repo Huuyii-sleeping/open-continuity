@@ -50,7 +50,7 @@ try {
   const image = await command(["inspect", name, "--format", "{{.Image}}"]);
   process.stdout.write(JSON.stringify({ fixture: "disposable real PostgreSQL", version, image, storage: "tmpfs", binding: "loopback only" }) + "\n");
   const code = await new Promise((resolve, reject) => {
-    child = spawn(process.execPath, [join(root, "node_modules/vitest/vitest.mjs"), "run", "test/storage-postgres-real.test.ts", ...process.argv.slice(2)], {
+    child = spawn(process.execPath, [join(root, "node_modules/vitest/vitest.mjs"), "run", "test/storage/storage-postgres-real.test.ts", ...process.argv.slice(2)], {
       cwd: root, stdio: "inherit",
       env: { ...process.env, OPEN_CONTINUITY_TEST_POSTGRES_URL: `postgresql://fictional_test:${password}@${address}/open_continuity_test` },
     });

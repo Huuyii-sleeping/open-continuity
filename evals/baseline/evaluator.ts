@@ -8,8 +8,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { DataType, newDb } from "pg-mem";
-import type { MemoryService } from "../../src/core/memory-service.js";
-import type { DatabasePool } from "../../src/postgres/postgres-memory-store.js";
+import type { MemoryService } from "../../src/core/application/memory-service.js";
+import type { DatabasePool } from "../../src/storage/postgres/postgres-memory-store.js";
 import { loadDataset, type BaselineCase } from "./dataset.js";
 import { latencySummary, mean, ratio, scoreRanking } from "./metrics.js";
 
@@ -38,13 +38,13 @@ export async function runtime(sourceRoot: string, backend: Backend) {
   let service: MemoryService | undefined;
   const moduleAt = (path: string) => import(pathToFileURL(join(sourceRoot, path)).href);
   try {
-    const { MemoryService: Service } = await moduleAt("src/core/memory-service.ts") as typeof import("../../src/core/memory-service.js");
+    const { MemoryService: Service } = await moduleAt("src/core/memory-service.ts") as typeof import("../../src/core/application/memory-service.js");
     let store: ConstructorParameters<typeof Service>[0];
     if (backend === "sqlite") {
-      const { SqliteMemoryStore } = await moduleAt("src/sqlite/sqlite-memory-store.ts") as typeof import("../../src/sqlite/sqlite-memory-store.js");
+      const { SqliteMemoryStore } = await moduleAt("src/sqlite/sqlite-memory-store.ts") as typeof import("../../src/storage/sqlite/sqlite-memory-store.js");
       store = new SqliteMemoryStore(join(directory, "fictional.db"));
     } else if (backend === "postgres-pg-mem") {
-      const { PostgresMemoryStore } = await moduleAt("src/postgres/postgres-memory-store.ts") as typeof import("../../src/postgres/postgres-memory-store.js");
+      const { PostgresMemoryStore } = await moduleAt("src/postgres/postgres-memory-store.ts") as typeof import("../../src/storage/postgres/postgres-memory-store.js");
       const database = newDb({ autoCreateForeignKeyIndices: true });
       database.public.registerFunction({ name: "pg_advisory_xact_lock", args: [DataType.integer], returns: DataType.integer, implementation: () => 1 });
       database.public.registerFunction({ name: "strpos", args: [DataType.text, DataType.text], returns: DataType.integer, implementation: (text: string, part: string) => text.indexOf(part) + 1 });

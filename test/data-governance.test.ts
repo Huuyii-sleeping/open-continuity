@@ -8,7 +8,7 @@ import { syncCaptureAdapter } from "../src/capture/capture-adapter-service.js";
 import { ConversationInbox } from "../src/capture/conversation-inbox.js";
 import type { ConversationThread } from "../src/capture/types.js";
 import { cleanupInjectionReceipts, injectionReceiptPath, injectionReceiptStatus, purgeInjectionReceipts } from "../src/injection/receipt-store.js";
-import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
+import { SqliteMemoryStore } from "../src/storage/sqlite/sqlite-memory-store.js";
 
 function fictionalThread(): ConversationThread {
   return {

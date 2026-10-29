@@ -4,7 +4,30 @@
 
 ## 当前状态
 
-- 当前阶段：**阶段5——运行可靠性已完成本地验收**；5A执行预算/容量，5B进程并发/恢复，5C分入口容量/观测独立实现与验收。阶段4确定性Context/引用保留，不进入Embedding；SQL硬取消、断电、完整身份认证和生产SLO仍未实现。
+- 最新[向量投影缓存与模型验证](./embedding-optimization.md)分别实现排名/缓存/模型回执；[验收](./embedding-optimization-validation.md)按共享账本与三轮容量配对记录热查询改善，保留冷启动、错选/误拒绝和验证模型资源失败。默认关闭。
+
+
+- 最新[Embedding 实验接入](./embedding-integration.md)已连接真实本地模型、SQLite 派生任务/向量、流式 Dense 及 Recall/Context/Query；[工程、质量、容量验收](./embedding-integration-validation.md)分开记录。默认关闭，否定误召回、10k 线性成本和模型安装/跨平台缺口保留。以下原型与7A报告是历史阶段证据。
+
+- [本地模型加载与验证](./embedding-hardening.md)：外置权重/平台缓存的本机 embedding 资源预算通过；新增独立文本对回执与文件完整性模块。小验证模型误判、强验证模型成本失败保留，默认 Dense 仍未接入。
+
+- [个人版成本与 Dense 准入](./embedding-refinement.md)：窄运行组合与闲置回收、独立准入/生命周期模块；旧 Required 保持，新否定误召回与预定活跃内存预算仍失败，默认向量通道未接入。
+
+- [个人版 Embedding 可行性验证](./embedding-feasibility.md)：本机 CPU 推理与共享进程原型跑通；安装/内存与无阈值 Dense 误召回仍阻止直接默认开启。生产向量能力尚未接入。
+
+- 本轮[最终审查与详细复测](./phase-7a-final-audit.md)独立记录模块化边界、契约修复、三轮工程测试、各层质量及容量，不覆盖早期7A历史结果。
+
+- 历史[7A线路收尾](./phase-7a-route-completion.md)与[验收](./phase-7a-route-completion-validation.md)：补选择策略、Runtime叶子边界、窄packer与职责/测试登记。早期7A数字按历史保留。
+
+- 7A内部线路与测试已补全；[设计/导航](./phase-7a-module-routes.md)、[本次验收](./phase-7a-module-routes-validation.md)记录该增量证据，初次7A报告保持历史结果。
+
+- 已交付的 **7A 模块化内核**：通道和 backend Reader 独立实现、窄消费者契约、兼容入口及依赖门禁。该阶段先完成重构与验证，随后已独立接入显式 Embedding 实验；默认向量检索继续关闭。见 [设计](./phase-7a-modular-kernel.md)、[验证](./phase-7a-validation.md) 和 [代码导航](../../src/core/README.md)。
+
+- 6D人工配置词对实验已撤销；后续模型辅助查询改写尚未实现。现有`memory_query.subqueries`接收调用方显式查询，内核尚不会自动用模型生成它们。
+
+- 阶段6轻量增量：6A分层诊断、6B可选SQLite英文单编辑fallback、6C收益/误召回/安全/稳定/成本消融。默认OFF，默认启用门禁不通过的失败原样记录；不是语义RAG全量完成。设计见[6A](./phase-6a-diagnostics.md)、[6B](./phase-6b-lexical-fallback.md)、[6C](./phase-6c-acceptance.md)，结果见[整阶段验收](./phase-6-validation.md)。阶段4/5已通过PR #12合并；历史首次验收状态仍保留，最新证据见[提交前复测](./phase-45-pr-validation.md)。
+
+- 已完成基础阶段：**阶段5——运行可靠性**；5A执行预算/容量，5B进程并发/恢复，5C分入口容量/观测独立实现与验收。阶段4确定性Context/引用保留，不进入Embedding；SQL硬取消、断电、完整身份认证和生产SLO仍未实现。
 - 2026-10-23：[阶段 3 设计](./phase-3-ranking.md) 和 [验证](./phase-3-validation.md)记录新结果；此前 [2C](./phase-2c-validation.md) 为独立候选交付时的历史证据，原数字保留。
 - 基线来源：`core-v2` 分叉点 `e23207aa9e746c71a599af8e2a0c913c5d59bf94`；它是阶段开始时的 `origin/main` 快照。
 - 原 Retrieval Core v2 Spike 已备份并校验后移出当前实现，可恢复，不属于阶段 1 交付。
@@ -12,6 +35,18 @@
 - 阶段运行期间 `origin/main` 已合入 Adapter hardening 并前进到 `9abe30956b67a99ff44fce11713c5838cfa364b0`；阶段 1–3 的历史基线保持原分叉。2026-10-25 的 PR 集成验证基于此已发布主线重新测试，PR 本身不修改 Adapter，也不复制其它工作区的未提交内容。
 
 ## 文档索引
+
+- [7A内部线路](./phase-7a-module-routes.md)：模块内操作边界、共享状态、读写时序与分项测试。
+- [7A内部线路验收](./phase-7a-module-routes-validation.md)：工程、独立报告、原质量与成本对照。
+
+- [7A 模块化设计](./phase-7a-modular-kernel.md)：模块总图、单通道设计、读写时序、窄接口与迁移边界。
+- [7A 独立验证](./phase-7a-validation.md)：兼容/工程、质量/安全/稳定性、成本和未实现项分别查看。
+
+
+- [6A逐层诊断](./phase-6a-diagnostics.md)：虚构固定标注、实际通道/独立重放、完整校验与能力边界。
+- [6A独立验收](./phase-6a-validation.md)：逐题瓶颈、不同问题数、标注局限、质量不变与下一步优先级。
+- [6B有界拼写fallback](./phase-6b-lexical-fallback.md)：触发条件、权限先过滤、评分解释、游标与默认关闭。
+- [6C接受协议](./phase-6c-acceptance.md)与[阶段6结果](./phase-6-validation.md)：原/新题开关消融、反例、成本及默认决策分开。
 
 - [阶段5总览](./phase-5-runtime-reliability.md)与[独立验收](./phase-5-validation.md)：执行保护、真实进程及容量成本分开。
 - [5A执行预算](./phase-5a-execution.md)：准入、deadline、迟到工作、错误与drain。

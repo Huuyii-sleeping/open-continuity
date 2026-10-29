@@ -60,7 +60,7 @@ try {
       }
       for (const endpoint of ["recall", "context"] as const) {
         const call = () => endpoint === "recall" ? rt.service.recall({ ...actor, query: scenario.query, limit: 5 })
-          : new (rt.service.constructor as typeof import("../../src/core/memory-service.js").MemoryService)(rt.store, {}, { defaultTokenBudget: 4096, maxTokenBudget: 4096, maxMemories: 20, requireUserConfirmed: true }).context({ ...actor, query: scenario.query });
+          : new (rt.service.constructor as typeof import("../../src/core/application/memory-service.js").MemoryService)(rt.store, {}, { defaultTokenBudget: 4096, maxTokenBudget: 4096, maxMemories: 20, requireUserConfirmed: true }).context({ ...actor, query: scenario.query });
         await call(); // One warmup; five samples are descriptive, not production latency evidence.
         const samples: number[] = [], selections: string[][] = [], statuses: string[][] = [], omissions: string[][] = [];
         let exposed = "";

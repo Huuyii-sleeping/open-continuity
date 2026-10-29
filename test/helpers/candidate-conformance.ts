@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { CandidateRetrieval, type CandidateSearchRequest, type CandidateSearchStore } from "../../src/core/candidate-search.js";
-import type { MemoryService } from "../../src/core/memory-service.js";
+import { CandidateRetrieval } from "../../src/core/retrieval/candidates.js";
+import type { CandidateSearchRequest, CandidateSearchStore } from "../../src/core/retrieval/contracts.js";
+import type { MemoryService } from "../../src/core/application/memory-service.js";
 import type { RememberInput } from "../../src/shared/types.js";
 
 export interface CandidateRuntime { store: CandidateSearchStore; service: MemoryService }

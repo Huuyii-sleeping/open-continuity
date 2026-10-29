@@ -1,10 +1,31 @@
 # OpenContinuity
 
+最新[Dense 优化与模型验证](docs/retrieval-core/embedding-optimization.md)把向量投影/缓存与候选验证拆成独立模块：同库三轮 10k 热 P95 中位数约 384→10.7ms；旧否定误召回下降，新池仍有误拒绝/错选，较强模型资源超标。默认继续关闭，冷启动与热缓存成绩分开，见[本轮分项验收](docs/retrieval-core/embedding-optimization-validation.md)。
+
+
 OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆与任务交接层。当前主线是把这套共享记忆接入 Agent 的真实对话闭环：为 CLI Agent 提供 Conversation Capture 与 Memory Injection Adapter，从 Agent 的官方可观测扩展面增量读取对话，先放入本地 Inbox，由用户选择性批准后沉淀为共享记忆，再在后续 Prompt 中注入少量相关上下文；需要更多证据时，Agent 仍可通过 MCP 主动深度查询。
 
 Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不是另一个独立产品。OpenContinuity 不修改第三方 Agent 源码，不把完整对话自动变成长期记忆，也不提供云端存储或主动上传服务。
 
 当前发布候选为 `1.1.0-beta.1`，定位是 Developer Preview：Lite 本地闭环已可验证，Team 是实现预览，Enterprise 尚未实现。
+
+[Embedding 实验接入](docs/retrieval-core/embedding-integration.md)已将本地模型、SQLite 派生索引和独立 Dense 通道接到 Recall / Context / Query；更新、删除和模型重建会使旧向量失效，模型失败回退到字面检索。**默认关闭**，不新增模型服务或 inference npm 依赖；显式 Core 实验仍需准备并校验本地模型文件。语义正例有收益，但否定误召回与 10k 线性扫描成本仍不支持默认开启。分开查看[质量、工程与容量结果](docs/retrieval-core/embedding-integration-validation.md)。
+
+当前分支已撤销人工配置同义词 / 别名实验。现有 `memory_query.subqueries` 接收调用方显式提供的子查询，内核不会自动用模型生成。
+
+[个人版 Embedding 成本与准入实验](docs/retrieval-core/embedding-refinement.md)新增未默认装配的 Dense 准入和本地模型生命周期模块；真实原型减少运行文件/内存，支持 idle 退出。新否定误召回与预设内存预算仍未通过，当前安装无需模型服务，生产 `semantic=false`，该前期实验当时尚未接入向量索引；当前显式实验见上方入口。
+
+[后续加载与文本对验证](docs/retrieval-core/embedding-hardening.md)使固定模型的本机 embedding 加载达到资源预算，并增加绑定回执的验证和流式文件校验；双模型质量/资源仍分别存在失败，未启用默认语义检索或增加生产模型依赖。
+
+[7A内部线路补全](docs/retrieval-core/phase-7a-module-routes.md)进一步分开Query召回/历史、Context装包、事实核实、引用以及存储读写/迁移。`npm run test:core:list`查看模块/线路，`npm run test:core -- --module=query --route=history`只验收该线路；完整报告分开显示失败、跳过与未验证。
+
+[7A线路收尾](docs/retrieval-core/phase-7a-route-completion.md)补齐独立选择策略、运行包装、预算后判定与存储直接契约；主要职责登记到实现/测试，报告拒绝同组零断言漏验，不把跳过当作完整验证。
+
+[7A 模块化内核](docs/retrieval-core/phase-7a-modular-kernel.md) 将召回通道、数据库 Reader、排名、事实、Context、Query、Answer 与运行保护分开实现。旧入口保留兼容，新增 `npm run check:architecture` 防止依赖再次混在一起；设计图和代码导航见 [Core README](src/core/README.md)。7A 保持原检索行为；后续显式 Embedding 实验独立记录，默认检索仍不使用向量。前后质量、性能和工程结果见 [7A 验证](docs/retrieval-core/phase-7a-validation.md)。
+
+[6A逐层失败诊断](docs/retrieval-core/phase-6a-diagnostics.md) 是离线评测工具，不改变生产检索策略。`npm run eval:diagnostics -- --report-dir=<新的目录>` 分存储、数据分区及Recall/Context/Query报告实际候选、排名、预算、事实拒绝、安全和稳定性。旧标注保持；新增固定验收题已暴露，不是独立盲测或语义增强证据。
+
+[阶段6B/6C](docs/retrieval-core/phase-6b-lexical-fallback.md) 实现SQLite有界英文单编辑拼写fallback及开关消融，仍不依赖embedding/模型。**默认关闭**：显式Core构造策略可选择，但拼写相近不等于语义相关；合法词歧义及宽探测成本不足以支持默认启用。`npm run eval:lexical -- --report-dir=<新的目录>`分别保留原题、新题、误召回、安全、稳定和1k/10k成本结果，ON失败不改标为通过。验收规则见[6C](docs/retrieval-core/phase-6c-acceptance.md)。
 
 [阶段5运行可靠性](docs/retrieval-core/phase-5-runtime-reliability.md) 增加每个MemoryService的共享单调deadline、无队列读准入及未结束读取容量保护；超时不再继续新读取，普通读返回`READ_TIMEOUT`，Query保留明确超时/abstain。默认最多16个读请求、8个未结束Store读取，满载返回`RUNTIME_BUSY`；关闭有界drain。同步SQLite仍不能硬取消，身份/scope/确认不变；真实进程恢复、持续Query和容量报告独立验证，不是断电安全、语义增强或生产SLO承诺。
 
@@ -382,7 +403,7 @@ PostgreSQL 使用两张核心表：
 - `memories_current`：当前有效记忆，供 `memory_recall` 快速查询。
 - `memory_events`：不可变事件历史，供 `memory_history` 审计查询。
 
-当前 Team Profile 尚未启用 pgvector，语义向量检索属于下一阶段；V1.0 的 Context Pack 和 Agentic Query 仍使用确定性混合检索，不引入外部 embedding 或生成模型。
+当前 Team Profile 尚未启用 pgvector 或 Dense。SQLite 已有显式 Core Embedding 实验，见上方接入与验收入口；默认 Context Pack 和 Agentic Query 仍使用确定性混合检索，不加载 embedding 或生成模型。
 
 ## 产品分层
 

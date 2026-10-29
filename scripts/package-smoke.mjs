@@ -22,6 +22,35 @@ try {
     stdio: ["ignore", "pipe", "inherit"],
   });
 
+  const modularCore = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", `
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+const root = process.argv[1], database = process.argv[2];
+const load = name => import(pathToFileURL(join(root, "dist/src", name)).href);
+for (const name of ["src/core/README.md", "docs/retrieval-core/phase-7a-modular-kernel.md", "docs/retrieval-core/phase-7a-validation.md"]) {
+  if (!existsSync(join(root, name))) throw new Error("Missing modular kernel documentation");
+}
+const { MemoryService } = await load("core/application/memory-service.js");
+const { SqliteMemoryStore } = await load("storage/sqlite/sqlite-memory-store.js");
+if ((await load("core/memory-service.js")).MemoryService !== MemoryService
+  || (await load("sqlite/sqlite-memory-store.js")).SqliteMemoryStore !== SqliteMemoryStore) throw new Error("Compatibility constructors differ");
+for (const name of ["migrate-sqlite.js", "migrate-postgres.js", "data.js"]) {
+  if (!existsSync(join(root, "dist/src/cli/storage", name))) throw new Error("Missing storage command");
+}
+const store = new SqliteMemoryStore(database), service = new MemoryService(store);
+const actor = { userId: "fictional-package-user", agentId: "fictional-reader" };
+try {
+  await service.remember({ ...actor, key: "focused", value: "needle needle needle", kind: "decision", userConfirmed: true, idempotencyKey: "fictional-focused" });
+  await service.remember({ ...actor, key: "diluted", value: "needle " + "filler ".repeat(100), kind: "decision", userConfirmed: true, idempotencyKey: "fictional-diluted" });
+  const result = await service.recall({ ...actor, query: "needle" });
+  if (result.memories[0]?.key !== "focused" || result.memories[0]?.retrieval?.evidence?.[0]?.score.model !== "fts5_bm25") throw new Error("Installed BM25 contract failed");
+  const reader = store.candidateReaders.full_text;
+  if ((await reader({ ...actor, query: "needle" })).hits.length !== 2) throw new Error("Installed Reader failed");
+  process.stdout.write(JSON.stringify({ legacyIdentity: true, independentReader: true, bm25: true, storageCommands: true, documentation: true }));
+} finally { await service.close(); }
+`, join(installDirectory, "node_modules/open-continuity"), join(directory, "fictional-module.db")], { encoding: "utf8" }));
+
   const cli = join(installDirectory, "node_modules", ".bin", "open-continuity");
   const demo = JSON.parse(execFileSync(cli, ["demo", "--json"], { encoding: "utf8" }));
   if (demo.ok !== true || demo.tools !== 9 || demo.handoff?.status !== "ready") {
@@ -70,6 +99,7 @@ process.exit(2);
     ok: true,
     package: filename,
     install: "isolated temporary prefix",
+    modularCore,
     demo: { tools: demo.tools, sharedMemory: demo.sharedMemory?.persistedAcrossAgentRestart, handoff: demo.handoff.status },
     claudeAdapter: { setup: claude.ok, doctor: claude.doctor.ok, capture: claude.steps.capture.enabled, injection: claude.steps.injection.enabled },
     governance: { conversationRetentionDays: governance.policies.conversationRetentionDays, longTermMemoryPreserved: governance.longTermMemory.preservedByTransientCleanup },
