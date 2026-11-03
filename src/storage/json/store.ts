@@ -20,6 +20,7 @@ import { decodeEventLedger, encodeEventLedger } from "../../core/memory/event-le
  * when multiple machines or high write concurrency are needed.
  */
 export class JsonFileStore implements MemoryStore, MemoryRepository, CandidateSearchStore {
+  readonly handoffReviewVersion = "handoff-review-v1" as const;
   readonly candidateReaders: BuiltinSyncCandidateReaders = Object.freeze<BuiltinSyncCandidateReaders>({
     exact: input => this.readCandidates("exact", input),
     structured: input => this.readCandidates("structured", input),

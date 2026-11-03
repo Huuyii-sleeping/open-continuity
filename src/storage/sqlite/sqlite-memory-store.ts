@@ -29,6 +29,7 @@ import { forgetSqlite } from "./writes/forget.js";
 import { rememberSqlite } from "./writes/remember.js";
 import { SqliteDenseIndex } from "./dense-index.js";
 import type { EmbeddingModelSpec } from "../../core/retrieval/dense/index-contracts.js";
+import { SQLITE_LEXICAL_INDEX_VERSION } from "./lexical-index.js";
 
 export interface SqliteMemoryStoreOptions {
   autoMigrate?: boolean;
@@ -38,9 +39,12 @@ export interface SqliteMemoryStoreOptions {
 
 
 export class SqliteMemoryStore implements MemoryStore, MemoryRepository, CandidateSearchStore {
+  readonly handoffReviewVersion = "handoff-review-v1" as const;
   readonly lexicalFallbackVersion = LEXICAL_FALLBACK_VERSION;
+  readonly lexicalIndexVersion?: typeof SQLITE_LEXICAL_INDEX_VERSION;
   readonly candidateReaders = createSqliteCandidateReaders({
     assertOpen: () => this.assertOpen(),
+    lexicalIndexVersion: () => this.lexicalIndexVersion,
     all: (sql, values) => this.all(sql, values),
     storageError: error => this.storageError(error),
   });
@@ -60,6 +64,7 @@ export class SqliteMemoryStore implements MemoryStore, MemoryRepository, Candida
       configureSqlite(this.database);
       if (options.autoMigrate !== false) migrateSqlite(this.database);
       else assertSqliteSchemaVersion(this.database);
+      if (assertSqliteSchemaVersion(this.database).has(5)) this.lexicalIndexVersion = SQLITE_LEXICAL_INDEX_VERSION;
       if (options.busyTimeoutMs !== undefined) this.database.exec(`PRAGMA busy_timeout = ${options.busyTimeoutMs}`);
       this.secureDatabaseFiles();
     } catch (error) {

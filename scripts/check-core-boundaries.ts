@@ -17,6 +17,8 @@ export function boundaryViolations(edges: DependencyEdge[]): BoundaryViolation[]
     if ((canonical(from) || from.startsWith("src/storage/")) && /^(?:src\/core\/[^/]+|src\/(?:sqlite|postgres)\/[^/]+)\.ts$/.test(to)) reason = "implementation imports a compatibility facade";
     else if (canonical(from) && !from.startsWith("src/core/application/") && to.startsWith("src/storage/") && to !== "src/storage/contracts.ts") reason = "Core domain depends on a storage implementation";
     else if (canonical(from) && !from.startsWith("src/core/application/") && ["pg", "node:sqlite"].includes(to)) reason = "Core domain depends on a database driver";
+    else if (from.startsWith("src/core/retrieval/reranking/") && /^src\/core\/(?:application|context|query|answer|facts|policy|retrieval\/dense)\//.test(to)) reason = "relevance scoring depends on a consumer or Dense admission";
+    else if (/^src\/core\/retrieval\/dense\/reranking\/(?:order|selection)\.ts$/.test(from) && to.startsWith("src/core/") && !/\/contracts\.ts$/.test(to)) reason = "pure Dense ordering or selection depends on a runtime implementation";
     else if (from.startsWith("src/storage/") && /^src\/core\/(application|context|query|answer|runtime)\//.test(to)) reason = "storage depends on a consuming or application module";
     else if (from.startsWith("src/storage/") && /^src\/core\/retrieval\/(pipeline|candidates|ranking)\.ts$/.test(to)) reason = "storage depends on retrieval orchestration or ranking";
     else if (from.startsWith("src/core/context/") && /^src\/core\/(application|query|answer)\//.test(to)) reason = "Context depends on a higher-level consumer";

@@ -26,7 +26,7 @@ function traceFor(input: CandidateSearchRequest, result: CandidateSearchResult, 
     status: result.status, implementation: result.implementation, truncated: result.truncated,
     ...(result.lexicalFallback ? { lexicalFallback: result.lexicalFallback } : {}),
     hits: result.hits.map(hit => {
-      if (hit.score.model === "cosine_similarity" || hit.match.type === "semantic_similarity" || hit.match.reason === "vector_neighbour") throw new Error("Unexpected Dense evidence in lexical diagnostics");
+      if ((hit.score.model === "cosine_similarity" || hit.score.model === "cross_encoder_logit") || hit.match.type === "semantic_similarity" || hit.match.reason === "vector_neighbour") throw new Error("Unexpected Dense evidence in lexical diagnostics");
       return { memory: project(label(hit.memory), hit.memory), rank: hit.channelRank, rankMeaning: hit.rankMeaning,
       score: hit.score, matchType: hit.match.type, matchReason: hit.match.reason, ...(hit.match.correction ? { correction: hit.match.correction } : {}) }; }) };
 }

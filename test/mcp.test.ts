@@ -83,6 +83,8 @@ describe("MCP server", () => {
       "memory_history",
       "memory_forget",
       "memory_handoff_create",
+      "memory_handoff_prepare",
+      "memory_handoff_confirm",
       "memory_handoff_resume",
     ]);
 

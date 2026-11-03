@@ -1,5 +1,33 @@
 # Lite benchmark
 
+## Reviewed Handoff workflow
+
+[Workflow validation](./handoff-workflow-validation.md) keeps protocol and actual Agent task results separate. Core/backend checks cover content/actor/approval bindings, expiry, atomic stale and delete/recreate rejection, private/scope isolation, idempotent retries and reopen. Cross-process evidence uses MCP preparation, CLI confirmation and a fresh MCP receiver; package smoke repeats the normal CLI path in an isolated install. These do not produce a model task-completion percentage.
+
+The real-client test uses a fictional workspace, temporary HOME/CODEX_HOME and no copied user configuration/history. Authentication failure or unavailable inference is `unverified`, not success. Existing `eval:suite`, `eval:quality` and `benchmark:lite` remain separate default-path regressions with unchanged labels; this increment does not claim a new retrieval score improvement.
+
+## Dense候选相关性重排实验
+
+[分项验收](./retrieval-core/relevance-reranking-validation.md)以本轮开始的完整工作区 Core 为 Before，与显式重排的 After 共用同一新评测器、事件账本、原模型和准入阈值。旧五组96题与新248条候选池的16题分别报告；新增题在首次模型推理前冻结，但作者生成且最终为已暴露回归，不能称独立盲测。候选排名诊断不作为最终出口召回结果；负例误召回与正例错选分开。
+
+复现：`npm run eval:dense -- --provider=<local-provider> --verifier=<local-verifier> --reranker=<local-reranker> --dataset=evals/datasets/reranking-window-challenge-v1.json --output=<outside-repo.json>`。`--reranking-candidates` 为4–20，默认20；重排支持验证默认最多1条，原基线验证最多4条。模型模块必须导出 `createReranker`，不自动安装/下载。原余弦0.62/margin0.14、NLI0.5/0.5与标注保持，raw logit没有零点准入门槛。
+
+重复请求的判断缓存、首次查询、模型准备和无缓存模型推理分别记录。推理不可用、绑定错误、索引失效和 deadline 拒绝计分，不能把 fail-open 当作成功。超过100条的索引按批推进，无进展或尝试超过10000次停止。普通 `benchmark:lite` 继续独立比较默认无模型路径。
+
+## 双向补召回实验
+
+[分项验收](./retrieval-core/dense-rescue-validation.md)比较冻结的本工作区 Before 与显式 `bidirectional_rescue`，沿用原四组标注、模型和阈值；新增 `dense-rescue-challenge-v1` 在首次推理前冻结，随后暴露的问题用于完善矛盾停止规则，因此最终成绩是已暴露回归，不能称独立盲测。三轮新进程交错配对，每组共用同一事件账本，每出口重复三次。失败扩窗方案、误选择数、无答案误召回、权限分母、稳定性和原始耗时均保留。
+
+复现：`npm run eval:dense -- --provider=<local-provider> --verifier=<local-verifier> --compare-rescue --dataset=evals/datasets/dense-rescue-challenge-v1.json --output=<outside-repo.json>`。需要重现旧第四组时，单独使用 `--dataset=evals/datasets/dense-verifier-challenge-v1.json`。索引代次变化、双向推理不可用和 deadline 都拒绝计分；不把 fail-open 或判断缓存命中当作准确性或模型速度。
+
+## SQLite 字面值索引与写入维护
+
+[本次设计与分项验收](./retrieval-core/sqlite-literal-index.md)独立比较原 `core-baseline-v1`、原 `candidate-v1` 和新增 `literal-value-v1.json`；新增集使用既有 candidate 契约格式，14 个完全虚构、已暴露的回归题，不称盲测或语义收益。SQLite 新集与旧源码采用同一评测器/标注/阈值；负例误召回、Recall@K、MRR、稳定性和权限分母分别保留。
+
+复现新集：`npm run eval:candidates -- --backends=sqlite --dataset=evals/datasets/literal-value-v1.json --report-dir=<new-dir>`；以 `--source=<clean-before>` 建立参考，再加 `--compare=<before>/raw-report.json`。旧源码在新 Required 回归中非零退出是缺陷证据，执行异常不能当作有效参考。原质量仍使用原命令单独比较。
+
+写入成本另测 1k/10k、同一虚构事件账本、三轮新进程 B→A/A→B/B→A，每种操作预热 10 次、保留 100 个样本。更新、仅元数据更新、删除、Exact、全文分开，首次导入计时另列；不清 OS 页缓存，不将某项更快替代其它成本或生产 SLO。普通 `benchmark:lite` 继续独立执行。
+
 [投影缓存与候选验证验收](./retrieval-core/embedding-optimization-validation.md)按同一事件账本重放各臂，固定 ID、事件、版本、时间戳和正文。质量对照分别显示 Legacy/优化、无验证/有验证，原标注与阈值不变；另禁用判断缓存做三次模型重载。1k/10k 采用新进程三轮交错配对，冷请求、热 P95、主进程峰值和模型进程成本单独报告；不以缓存命中等同模型推理速度。`eval:dense` 可显式追加 `--verifier`、`--dataset`、`--compare-ranking`，没有自动安装或下载。
 
 

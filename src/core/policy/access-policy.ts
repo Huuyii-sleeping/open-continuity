@@ -1,6 +1,6 @@
 import { OpenContinuityError } from "../../shared/errors.js";
 
-export type AccessOperation = "remember" | "recall" | "context" | "query" | "forget" | "history" | "handoff_create" | "handoff_resume";
+export type AccessOperation = "remember" | "recall" | "context" | "query" | "forget" | "history" | "handoff_create" | "handoff_resume" | "handoff_prepare" | "handoff_confirm";
 export type AccessTransport = "http" | "mcp" | "internal";
 
 export interface AccessRequest {

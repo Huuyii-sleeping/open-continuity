@@ -8,6 +8,7 @@ import { candidateConformance } from "../helpers/candidate-conformance.js";
 import { factConformance } from "../helpers/fact-conformance.js";
 import { contextSelectionConformance } from "../helpers/context-selection-conformance.js";
 import { answerConformance } from "../helpers/answer-conformance.js";
+import { handoffReviewConformance } from "../helpers/handoff-review-conformance.js";
 
 // Explicit opt-in only: never use DATABASE_URL, PG* defaults or the user's service database.
 const connection = process.env.OPEN_CONTINUITY_TEST_POSTGRES_URL;
@@ -52,6 +53,7 @@ async function runtime() {
 
 describe.skipIf(!connection)("real PostgreSQL disposable storage evidence", () => {
   storageConformance("postgres-real", runtime);
+  handoffReviewConformance("postgres-real", runtime);
   candidateConformance("postgres-real", runtime);
   contextSelectionConformance("postgres-real", runtime);
   answerConformance("postgres-real", runtime);

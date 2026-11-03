@@ -1,5 +1,11 @@
 # 内核模块导航
 
+[交接流程](../../docs/handoff-workflow.md)新增 `memory/handoff/review.ts`（只读准备与确认绑定）、`write-guard.ts`（既有事务内快照检查）和 `render.ts`（审核/接手输出）。`application`装配到原Handoff；各Store复用 `resolveEvolution`，不新增数据库连接或模型依赖。`test:core -- --module=memory --route=handoff-review` / `handoff-render` 与跨存储 `handoff-review-storage` 分别验证。
+
+最新[相关性重排](../../docs/retrieval-core/relevance-reranking.md)由 `retrieval/reranking/` 独立提供模型评分/生命周期/绑定校验，`dense/reranking/` 负责纯排序、保留基线的选择及回执验证。使用 `test:core -- --module=retrieval --route=relevance-reranker`、`--route=reranking-order`、`--route=dense-reranking` 分别定位。它只作用于显式 Dense 的授权窗口，默认不加载模型。
+
+最新[双向补召回](../../docs/retrieval-core/dense-rescue.md)由 `retrieval/dense/rescue.ts` 独立决策和编排窗口；`local-pair-verifier.ts`提供绑定方向的判断，`retriever.ts`统一授权排名、模型身份和共享 deadline。`npm run test:core -- --module=retrieval --route=dense-rescue`可独立定位该线路。默认仍为字面检索，旧显式 Dense 策略保持。
+
 最新[投影缓存与模型验证](../../docs/retrieval-core/embedding-optimization.md)把 `retrieval/dense/ranker.ts`、`snapshot-cache.ts`、`local-pair-verifier.ts` 与 `verification/contracts.ts` 独立实现。SQLite 通过向量投影和受资格约束的正文接口协作；缓存和模型均有预算/版本边界，默认工厂仍不装配模型。验证回执随评分证据传入 Recall/Context/Query。
 
 
@@ -25,6 +31,7 @@ core/
     candidates.ts    注册与有界调度
     retrievers/      exact / structured / full-text 独立入口
     dense/           模型/索引窄契约、准入、流式前列比较与评分验证；显式实验入口
+    reranking/       独立相关性模型、有限生命周期、评分绑定；无数据库/准入副作用
     full-text/       可选拼写算法与证据校验
     ranking.ts       排名编排；ranking/ 拆候选一致性、单路/最佳排名、RRF 与评分解释
     validation.ts    批次一致性检查

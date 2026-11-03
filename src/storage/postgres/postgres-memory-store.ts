@@ -26,6 +26,7 @@ interface PostgresMemoryStoreOptions {
 
 
 export class PostgresMemoryStore implements MemoryStore, MemoryRepository, CandidateSearchStore {
+  readonly handoffReviewVersion = "handoff-review-v1" as const;
   readonly candidateReaders = createPostgresCandidateReaders({
     rows: async (sql, values) => {
       await this.initialize();

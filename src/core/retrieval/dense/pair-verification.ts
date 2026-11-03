@@ -15,7 +15,8 @@ export function verifyDensePair(request: DensePairRequest, evidence: DensePairEv
     || !Number.isFinite(policy.maxContradiction) || policy.maxContradiction < 0 || policy.maxContradiction > 1
     || !Number.isFinite(policy.minEntailment) || policy.minEntailment < 0 || policy.minEntailment > 1
     || typeof request.memoryId !== "string" || !request.memoryId.trim()
-    || !fingerprint.test(request.queryFingerprint) || !fingerprint.test(request.contentFingerprint)) {
+    || !fingerprint.test(request.queryFingerprint) || !fingerprint.test(request.contentFingerprint)
+    || !["memory_to_query", "query_to_memory"].includes(request.direction ?? "memory_to_query")) {
     throw new OpenContinuityError("VALIDATION_ERROR", "Invalid Dense text-pair verification policy or request", 400);
   }
   const policyFingerprint = createHash("sha256").update(JSON.stringify({
@@ -27,6 +28,7 @@ export function verifyDensePair(request: DensePairRequest, evidence: DensePairEv
     modelFingerprint: policy.modelFingerprint, memoryId: request.memoryId,
     queryFingerprint: request.queryFingerprint, contentFingerprint: request.contentFingerprint,
     contradiction: null, entailment: null, meaning: "text_pair_model_support",
+    ...(request.direction ? { direction: request.direction } : {}),
   };
   if (evidence === null) return receipt;
   if (evidence.memoryId !== request.memoryId || evidence.modelFingerprint !== policy.modelFingerprint
@@ -34,8 +36,10 @@ export function verifyDensePair(request: DensePairRequest, evidence: DensePairEv
     || !probabilities(evidence.memoryToQuery) || (evidence.queryToMemory !== undefined && !probabilities(evidence.queryToMemory))) {
     throw new OpenContinuityError("STORAGE_ERROR", "Unbound or invalid Dense text-pair evidence", 500);
   }
-  const contradiction = evidence.memoryToQuery.contradiction;
-  const entailment = evidence.memoryToQuery.entailment;
+  const evaluated = request.direction === "query_to_memory" ? evidence.queryToMemory : evidence.memoryToQuery;
+  if (!evaluated) throw new OpenContinuityError("STORAGE_ERROR", "Missing reverse Dense support evidence", 500);
+  const contradiction = evaluated.contradiction;
+  const entailment = evaluated.entailment;
   const result = { ...receipt, contradiction, entailment };
   if (contradiction >= policy.maxContradiction) return { ...result, reason: "contradictory_pair" };
   if (entailment < policy.minEntailment) return { ...result, reason: "insufficient_pair_support" };

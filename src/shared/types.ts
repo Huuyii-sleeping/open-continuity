@@ -159,6 +159,7 @@ export const handoffCreateInputSchema = z.object({
   blockedBy: z.array(z.string().min(1)).max(50).default([]),
   expiresAt: z.iso.datetime({ offset: true }).optional(), sensitivity: sensitivitySchema.default("public"),
   idempotencyKey: z.string().min(1), metadata: jsonMetadataSchema.default({}),
+  expectedVersion: z.number().int().min(0).optional(),
 }).superRefine((input, context) => {
   if (input.expiresAt && Date.parse(input.expiresAt) <= Date.now()) {
     context.addIssue({ code: "custom", path: ["expiresAt"], message: "expiresAt must be in the future" });

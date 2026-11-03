@@ -79,6 +79,7 @@ export class RetrievalPipeline {
   capabilityPolicy() {
     return {
       scored: Boolean(this.candidates), channels: [...this.enabledChannels, ...(this.dense ? ["dense" as const] : [])], candidateLimit: this.candidateLimit,
+      lexicalIndexVersion: this.store.lexicalIndexVersion ?? null,
       rrfK: this.rrfK, exactPrecedence: this.exactPrecedence, factGroupLimit: this.factGroupLimit,
       experimentalDense: this.dense ? { status: "experimental" as const, mode: this.dense.mode, ...this.dense.fingerprint() } : null,
       lexicalFallbackSupported: Boolean(this.candidates) && this.store.lexicalFallbackVersion === LEXICAL_FALLBACK_VERSION,
@@ -91,6 +92,7 @@ export class RetrievalPipeline {
       rankingVersion: RANKING_VERSION, candidateLimit: this.candidateLimit, rrfK: this.rrfK,
       channels: [...this.enabledChannels].sort(), exactPrecedence: this.exactPrecedence, fusion: this.fusion, requireUserConfirmed,
       factPolicy: FACT_POLICY, factGroupLimit: this.factGroupLimit,
+      ...(this.store.lexicalIndexVersion ? { lexicalIndexVersion: this.store.lexicalIndexVersion } : {}),
       ...(this.dense ? { experimentalDense: this.dense.fingerprint() } : {}),
       ...(this.lexicalFallback ? { lexicalFallback: { version: LEXICAL_FALLBACK_VERSION, ...LEXICAL_FALLBACK_LIMITS } } : {})
     };

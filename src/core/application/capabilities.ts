@@ -7,10 +7,12 @@ export function capabilitiesWithServiceSupport(capabilities: RuntimeCapabilities
   const facts = service.supportsFactDeclarations(), policy = service.retrievalCapabilityPolicy(), context = service.contextCapabilityPolicy();
   const { experimentalDense: _previousDense, ...baseRetrieval } = capabilities.retrieval;
   return { ...capabilities,
+    handoff: { ...capabilities.handoff, reviewedDrafts: service.supportsReviewedHandoff(), reviewVersion: service.supportsReviewedHandoff() ? "handoff-review-v1" : null },
     readRuntime: service.readRuntimeCapabilities(),
     agenticQuery: { ...capabilities.agenticQuery, ...service.queryCapabilityPolicy() },
     memory: { ...capabilities.memory, evolution: { ...capabilities.memory.evolution, factDeclarations: facts ? "explicit_v1" : false } },
-    retrieval: { ...baseRetrieval, semantic: Boolean(policy.experimentalDense),
+    retrieval: { ...baseRetrieval, semantic: Boolean(policy.experimentalDense), rerank: Boolean(policy.experimentalDense?.reranking),
+      lexicalIndexVersion: policy.lexicalIndexVersion,
       ...(policy.experimentalDense ? { experimentalDense: policy.experimentalDense } : {}), channels: policy.channels, candidateLimit: policy.candidateLimit, rrfK: policy.rrfK,
       lexicalFallback: { supported: policy.lexicalFallbackSupported, enabled: policy.lexicalFallback !== null,
         version: policy.lexicalFallbackSupported ? LEXICAL_FALLBACK_VERSION : null, limits: policy.lexicalFallbackSupported ? LEXICAL_FALLBACK_LIMITS : null },

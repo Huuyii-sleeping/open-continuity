@@ -1,6 +1,16 @@
 # OpenContinuity
 
-最新[Dense 优化与模型验证](docs/retrieval-core/embedding-optimization.md)把向量投影/缓存与候选验证拆成独立模块：同库三轮 10k 热 P95 中位数约 384→10.7ms；旧否定误召回下降，新池仍有误拒绝/错选，较强模型资源超标。默认继续关闭，冷启动与热缓存成绩分开，见[本轮分项验收](docs/retrieval-core/embedding-optimization-validation.md)。
+新增[准备交接、确认、接手](docs/handoff-workflow.md)：来源Agent先生成可审核草稿，用户确认精确内容后保存，接手Agent恢复既有Handoff。支持正常CLI、MCP和HTTP入口；默认不加载模型，状态变化阻止旧草稿覆盖。工程与真实模型验收[分别记录](docs/handoff-workflow-validation.md)。
+
+先看[当前状态与下一步](docs/project-status.md)：默认共享记忆/任务交接基础已实现；Embedding与重排为默认关闭的Core实验。下一阶段集中验证跨Agent任务接力的实际效果。下方增量说明保留各阶段设计与历史验收。
+
+最新[独立相关性重排](docs/retrieval-core/relevance-reranking.md)对显式 Dense 实验的前20条授权候选进行查询/正文打分，再沿用原支持验证；正常拒绝时保留原已验证结果。排序分数不代替权限、批准或事实判断。默认不加载模型，实际收益、未解决的漏召回及额外成本见[分项验收](docs/retrieval-core/relevance-reranking-validation.md)。
+
+最新[有预算的双向补召回](docs/retrieval-core/dense-rescue.md)把候选生成和最终准入分开：原命中保留，字面检索与旧 Dense 都漏掉时才验证有限窗口；首候选矛盾就停止，新增项必须双向支持且窗口内唯一。它是显式实验，默认关闭；[质量与成本](docs/retrieval-core/dense-rescue-validation.md)保留失败方案、错选和小幅收益。
+
+最新 [SQLite 字面值索引优化](docs/retrieval-core/sqlite-literal-index.md)让路径、引号等内容按原值检索，避免 JSON 转义造成漏召回和噪声。Schema 5 使用稳定整数索引指针维护 FTS，并跳过内容未变的重建；原始值、事件、版本和权限保持。SQLite 检索回执/能力新增 `lexicalIndexVersion`，升级后的评分检索游标需从第一页重启。工程、原质量集、新字面回归与写入成本分别验收。
+
+前一增量[Dense 优化与模型验证](docs/retrieval-core/embedding-optimization.md)把向量投影/缓存与候选验证拆成独立模块：同库三轮 10k 热 P95 中位数约 384→10.7ms；旧否定误召回下降，新池仍有误拒绝/错选，较强模型资源超标。默认继续关闭，冷启动与热缓存成绩分开，见[本轮分项验收](docs/retrieval-core/embedding-optimization-validation.md)。
 
 
 OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆与任务交接层。当前主线是把这套共享记忆接入 Agent 的真实对话闭环：为 CLI Agent 提供 Conversation Capture 与 Memory Injection Adapter，从 Agent 的官方可观测扩展面增量读取对话，先放入本地 Inbox，由用户选择性批准后沉淀为共享记忆，再在后续 Prompt 中注入少量相关上下文；需要更多证据时，Agent 仍可通过 MCP 主动深度查询。
@@ -276,7 +286,7 @@ HTTP 服务默认监听 http://127.0.0.1:8787。MCP Server 使用 stdio transpor
 
 手动配置多个客户端时，必须保持 `OPEN_CONTINUITY_USER_ID` 相同，并为每个客户端设置不同的 `OPEN_CONTINUITY_AGENT_ID`。优先使用 CLI 连接器自动生成和管理这两个身份。
 
-客户端接入后会发现九个工具：原有的 `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`，以及 `memory_handoff_create` 和 `memory_handoff_resume`。`memory_capabilities` 用于发现当前 Profile 和可用能力；`memory_context` 用于一次检索后生成 Context Pack；`memory_query` 用于有预算的多步检索。Agent 是否主动调用这些工具仍由客户端/模型的工具策略决定；Conversation Capture 是独立的显式同步/watch 入口，不依赖模型主动调用 MCP。
+客户端接入后会发现十一个工具：原有的 `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`，以及 `memory_handoff_create`、`memory_handoff_prepare`、`memory_handoff_confirm` 和 `memory_handoff_resume`。交接推荐先prepare、展示草稿、用户批准后confirm；旧create保留直接写入兼容。`memory_capabilities` 用于发现当前 Profile 和可用能力；`memory_context` 用于一次检索后生成 Context Pack；`memory_query` 用于有预算的多步检索。Agent 是否主动调用这些工具仍由客户端/模型的工具策略决定；Conversation Capture 是独立的显式同步/watch 入口，不依赖模型主动调用 MCP。
 
 ## Trae Conversation Capture（实验性）
 
@@ -302,7 +312,7 @@ Codex Adapter 通过公开的本地 `codex app-server --stdio` JSON-RPC 接口�
 
 ## Handoff Capsule
 
-用户明确说“交接一下”时，Agent 可以调用 `memory_handoff_create`，保存任务摘要、状态、关键决策、下一步、产物和阻塞项。另一个 Agent 通过 `memory_handoff_resume` 按 `taskId` 恢复最新的未过期交接包。交接包使用 task scope，不会混入其他任务，并可配置 `expiresAt`。它解决的是一次工作的可靠续接，不等同于永久用户画像。
+用户说“准备交接”时，Agent可调用 `memory_handoff_prepare` 展示摘要、状态、决策、下一步、产物与阻碍；用户核对内容/范围后，来源Agent调用 `memory_handoff_confirm` 保存原草稿。另一个Agent通过 `memory_handoff_resume` 按 `taskId` 恢复当前已确认、未过期交接包。交接包使用task scope并可配置 `expiresAt`。旧 `memory_handoff_create` 保留直接创建兼容；完整示例见[交接流程](docs/handoff-workflow.md)。
 
 ## 隐私边界
 

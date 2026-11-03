@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import { OpenContinuityError } from "../../shared/errors.js";
 import { memoryFactSchema, type MemoryConfidence, type MemoryEvolutionAction, type MemoryEvolutionReceipt, type MemoryFact, type ParsedRememberInput, type ResolvedMemory } from "../../shared/types.js";
 import { isJsonObject, mergeJsonObjects } from "./merge.js";
+import { guardReviewedHandoff } from "./handoff/write-guard.js";
 
 
 
@@ -10,6 +11,7 @@ export interface EvolutionResolution {
 }
 
 export function resolveEvolution(previous: ResolvedMemory | undefined, input: ParsedRememberInput): EvolutionResolution {
+  guardReviewedHandoff(previous, input);
   if (input.fact) memoryFactSchema.parse(input.fact);
   if ((input.fact || previous?.fact) && (!input.userConfirmed || input.expectedVersion === undefined)) {
     throw new OpenContinuityError("VALIDATION_ERROR", "Changing an explicit fact requires confirmation and compare-and-set", 400);

@@ -42,7 +42,14 @@ function consistency(path: string) {
   try {
     expect(db.prepare("PRAGMA integrity_check").get()!.integrity_check).toBe("ok");
     expect(db.prepare("SELECT COUNT(*) AS n FROM memories_current m LEFT JOIN memory_events e ON e.id=m.source_event_id WHERE e.id IS NULL OR m.version<>e.memory_version OR m.value<>e.value").get()!.n).toBe(0);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM memories_current m LEFT JOIN memories_fts f ON f.memory_id=m.id WHERE f.memory_id IS NULL OR f.memory_key<>m.memory_key OR f.value_text<>m.value").get()!.n).toBe(0);
+    const indexed = db.prepare("SELECT m.value, f.value_text, m.memory_key, f.memory_key AS indexed_key FROM memories_current m LEFT JOIN memories_fts f ON f.memory_id=m.id").all();
+    for (const row of indexed) {
+      // These process fixtures are literal strings; compare against independent decoded values.
+      expect(row.value_text).toBe(JSON.parse(String(row.value)));
+      expect(row.indexed_key).toBe(row.memory_key);
+    }
+    expect(db.prepare("SELECT COUNT(*) AS n FROM memories_current m LEFT JOIN memory_fts_keys k ON k.memory_id=m.id LEFT JOIN memories_fts f ON f.rowid=k.rowid WHERE k.rowid IS NULL OR f.memory_id<>m.id").get()!.n).toBe(0);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM memory_fts_keys k LEFT JOIN memories_current m ON m.id=k.memory_id WHERE m.id IS NULL").get()!.n).toBe(0);
     expect(db.prepare("SELECT COUNT(*) AS n FROM memories_fts f LEFT JOIN memories_current m ON m.id=f.memory_id WHERE m.id IS NULL").get()!.n).toBe(0);
   } finally { db.close(); }
 }

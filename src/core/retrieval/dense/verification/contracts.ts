@@ -7,7 +7,7 @@ export interface DensePairEvidence {
   contentFingerprint: string;
   modelFingerprint: string;
   memoryToQuery: PairProbabilities;
-  /** Optional diagnostic only: NLI is directional; a reversed question cannot veto its premise. */
+  /** Diagnostic for the original forward policy; explicit query_to_memory requests evaluate this direction. */
   queryToMemory?: PairProbabilities;
 }
 export interface DensePairPolicy {
@@ -20,8 +20,11 @@ export interface DensePairRequest {
   memoryId: string;
   queryFingerprint: string;
   contentFingerprint: string;
+  /** Omission keeps the original directional veto. Reverse support is an explicit experiment. */
+  direction?: "memory_to_query" | "query_to_memory";
 }
 export interface DensePairReceipt {
+  direction?: "memory_to_query" | "query_to_memory";
   version: "dense-pair-v1";
   accepted: boolean;
   reason: "verified_pair" | "contradictory_pair" | "insufficient_pair_support" | "verification_unavailable";
@@ -48,6 +51,7 @@ export interface BoundDensePairReceipt extends DensePairReceipt {
   sourceEventId: string; memoryVersion: number; accessFingerprint: string; cache: "hit" | "miss" | "unavailable";
 }
 export interface DensePairVerifier {
+  readonly directions?: readonly ("memory_to_query" | "query_to_memory")[];
   readonly policy: Readonly<DensePairPolicy>;
   fingerprint(): { model: string; policy: string; runtime: string };
   verify(request: BoundDensePairRequest, budget?: DenseExecutionBudget): Promise<BoundDensePairReceipt>;

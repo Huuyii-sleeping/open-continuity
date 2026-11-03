@@ -15,6 +15,7 @@ type PairInput = { kind: "warmup" } | { kind: "pair"; premise: string; hypothesi
 
 /** A bounded model veto after retrieval eligibility. It never reads storage or changes memory authority. */
 export class LocalDensePairVerifier implements DensePairVerifier {
+  readonly directions = Object.freeze(["memory_to_query", "query_to_memory"] as const);
   readonly policy: Readonly<DensePairPolicy>;
   readonly runtimePolicy: Readonly<DenseVerifierPolicy>;
   private readonly policyFingerprint: string;
@@ -59,7 +60,8 @@ export class LocalDensePairVerifier implements DensePairVerifier {
     const base: BoundDensePairReceipt = { ...verifyDensePair(request, null, this.policy), sourceEventId: request.sourceEventId,
       memoryVersion: request.memoryVersion, accessFingerprint: request.accessFingerprint, cache: "unavailable" };
     const key = hash(JSON.stringify({ memory: request.memoryId, event: request.sourceEventId, version: request.memoryVersion,
-      access: request.accessFingerprint, query: request.queryFingerprint, content: request.contentFingerprint, policy: this.policyFingerprint }));
+      access: request.accessFingerprint, query: request.queryFingerprint, content: request.contentFingerprint, policy: this.policyFingerprint,
+      ...(request.direction ? { direction: request.direction } : {}) }));
     const cached = this.cache.get(key);
     if (cached && cached.expires > performance.now()) {
       this.cache.delete(key); this.cache.set(key, cached); return structuredClone({ ...cached.receipt, cache: "hit" });
@@ -67,13 +69,14 @@ export class LocalDensePairVerifier implements DensePairVerifier {
     if (cached) this.remove(key);
     const deadline = new ReadDeadline(this.runtimePolicy.timeoutMs);
     let probabilities: PairProbabilities | null;
-    try { probabilities = await deadline.wait(() => budget ? budget.wait(() => this.owner.run({ kind: "pair", premise: request.memoryText, hypothesis: request.query }))
-      : this.owner.run({ kind: "pair", premise: request.memoryText, hypothesis: request.query })); }
+    const input: PairInput = { kind: "pair", premise: request.direction === "query_to_memory" ? request.query : request.memoryText,
+      hypothesis: request.direction === "query_to_memory" ? request.memoryText : request.query };
+    try { probabilities = await deadline.wait(() => budget ? budget.wait(() => this.owner.run(input)) : this.owner.run(input)); }
     catch (error) { if (error instanceof OpenContinuityError && error.code === "STORAGE_ERROR") throw error; return base; }
     if (!probabilities) throw new OpenContinuityError("STORAGE_ERROR", "Missing verifier probabilities", 500);
     const receipt: BoundDensePairReceipt = { ...base, ...verifyDensePair(request, { memoryId: request.memoryId,
       queryFingerprint: request.queryFingerprint, contentFingerprint: request.contentFingerprint, modelFingerprint: this.policy.modelFingerprint,
-      memoryToQuery: probabilities }, this.policy), cache: "miss" };
+      memoryToQuery: probabilities, ...(request.direction === "query_to_memory" ? { queryToMemory: probabilities } : {}) }, this.policy), cache: "miss" };
     deadline.check(); budget?.check(); this.assertOpen();
     if (this.runtimePolicy.cacheEntries) {
       while (this.cache.size >= this.runtimePolicy.cacheEntries) this.remove(this.cache.keys().next().value!);

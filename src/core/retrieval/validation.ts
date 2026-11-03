@@ -16,7 +16,7 @@ export function validateCandidateBatches(batches: CandidateSearchResult[]): void
     if (batch.channel === "dense") validateDenseEvidence(batch);
     else if (batch.dense || batch.implementation === "sqlite_dense_experimental") invalid();
     batch.hits.forEach((hit, i) => {
-      if (hit.verification && batch.channel !== "dense") invalid();
+      if ((hit.verification || hit.reranking) && batch.channel !== "dense") invalid();
       if (hit.channel !== batch.channel || hit.channelRank !== i + 1 || !hit.memory.id) invalid();
       if (batch.channel === "dense") return;
       if (hit.score.model === "fts5_bm25" || hit.score.model === "token_edit_distance") validateFullTextEvidence(hit, batch, i);

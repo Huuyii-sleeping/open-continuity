@@ -6,6 +6,17 @@ export interface RegisteredCoreContract { responsibility: string; implementation
 const unit = (responsibility: string, implementation: string, test: string): RegisteredCoreContract => ({ responsibility, implementation, test, level: "unit" });
 const backend = (responsibility: string, implementation: string, test: string): RegisteredCoreContract => ({ responsibility, implementation, test, level: "backend_contract" });
 export const registeredCoreContracts: readonly RegisteredCoreContract[] = [
+  { responsibility: "memory/handoff-review", implementation: "src/core/memory/handoff/review.ts", test: "test/core/memory/handoff-review.test.ts", level: "integration" },
+  { responsibility: "memory/handoff-render", implementation: "src/core/memory/handoff/render.ts", test: "test/core/memory/handoff-render.test.ts", level: "integration" },
+  { responsibility: "application/handoff-cli", implementation: "src/cli/handoff.ts", test: "test/handoff-cli.test.ts", level: "integration" },
+  { responsibility: "application/handoff-process-workflow", implementation: "src/mcp/server.ts", test: "test/handoff-workflow.test.ts", level: "integration" },
+  { responsibility: "memory/handoff-atomic-guard", implementation: "src/core/memory/handoff/write-guard.ts", test: "test/storage/handoff-review-storage.test.ts", level: "backend_contract" },
+  unit("retrieval/relevance-model", "src/core/retrieval/reranking/local-reranker.ts", "test/core/retrieval/relevance-reranker.test.ts"),
+  unit("retrieval/relevance-order", "src/core/retrieval/dense/reranking/order.ts", "test/core/retrieval/reranking-order.test.ts"),
+  { responsibility: "retrieval/dense-reranking", implementation: "src/core/retrieval/dense/reranking/selection.ts", test: "test/core/retrieval/dense-reranking.test.ts", level: "integration" },
+  { responsibility: "retrieval/dense-bidirectional-rescue", implementation: "src/core/retrieval/dense/rescue.ts", test: "test/core/retrieval/dense-rescue.test.ts", level: "integration" },
+  backend("storage-sqlite/lexical-derived-index", "src/storage/sqlite/lexical-index.ts", "test/storage/sqlite-lexical-index.test.ts"),
+  { responsibility: "retrieval/literal-values", implementation: "src/storage/sqlite/readers/full-text.ts", test: "test/core/retrieval/literal-values.test.ts", level: "integration" },
   { responsibility: "retrieval/dense-projection-cache", implementation: "src/core/retrieval/dense/ranker.ts", test: "test/core/retrieval/dense-snapshot-cache.test.ts", level: "integration" },
   { responsibility: "retrieval/dense-model-veto", implementation: "src/core/retrieval/dense/local-pair-verifier.ts", test: "test/core/retrieval/dense-local-verifier.test.ts", level: "integration" },
   { responsibility: "retrieval/dense-optimizer-parity", implementation: "src/core/retrieval/dense/ranker.ts", test: "test/core/retrieval/dense-optimizer-parity.test.ts", level: "integration" },

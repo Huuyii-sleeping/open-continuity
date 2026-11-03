@@ -11,7 +11,7 @@ export function coreTestCatalog(root: string): ModuleTestRoute[] {
   assertCoreContractMap(root);
   const groups = new Map<string, ModuleTestRoute>();
   const files = ["test/core", "test/storage", "test/reliability"].flatMap(directory => testFiles(root, directory));
-  files.push("test/http.test.ts", "test/mcp.test.ts", "test/store-factory.test.ts");
+  files.push("test/http.test.ts", "test/mcp.test.ts", "test/store-factory.test.ts", "test/handoff-cli.test.ts", "test/handoff-workflow.test.ts");
   for (const file of files.sort()) {
     const basename = file.split("/").at(-1)!.replace(/\.test\.ts$/, "");
     let module: string, route: string;

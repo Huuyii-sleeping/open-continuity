@@ -3,7 +3,7 @@ export interface ReadStageReceipt { stage: ReadStage; started: number; settled: 
 
 export const READ_RUNTIME_VERSION = "bounded-reads-v1" as const;
 
-export type ReadOperation = "recall" | "context" | "query" | "history" | "handoff_resume";
+export type ReadOperation = "recall" | "context" | "query" | "history" | "handoff_resume" | "handoff_prepare";
 export interface ReadRuntimeReceipt {
   version: typeof READ_RUNTIME_VERSION; operation: ReadOperation;
   outcome: "completed" | "timeout" | "busy" | "failed" | "closed";

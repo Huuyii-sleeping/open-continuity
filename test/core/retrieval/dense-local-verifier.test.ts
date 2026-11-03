@@ -28,6 +28,16 @@ it("binds a model verdict to content, query, event, version and access scope", a
 it("rejects caller fingerprints that do not describe the actual text", async () => {
   const { value, calls } = setup(); await expect(value.verify(request({ query: "changed query" }))).rejects.toThrow(/Unbound/); expect(calls.load).toBe(0);
 });
+it("binds direction to receipts and caches, and evaluates reverse input in the correct order", async () => {
+  const inputs: string[][] = [];
+  const { value, calls } = setup(async (premise, hypothesis) => { inputs.push([premise, hypothesis]); return { entailment: .9, neutral: .05, contradiction: .05 }; });
+  const forward = await value.verify(request()), reverseRequest = request({ direction: "query_to_memory" });
+  const reverse = await value.verify(reverseRequest); validateBoundVerification(reverseRequest, reverse, value);
+  expect(inputs).toEqual([["fictional approved value", "fictional query"], ["fictional query", "fictional approved value"]]);
+  expect((await value.verify(reverseRequest)).cache).toBe("hit"); expect(calls.run).toBe(2);
+  expect(() => validateBoundVerification(reverseRequest, forward, value)).toThrow(/Unbound/);
+  await value.verify(request({ direction: "memory_to_query" })); expect(calls.run).toBe(3);
+});
 it("caches model rejection as rejection and never treats it as approval", async () => {
   const { value, calls } = setup(async () => ({ entailment: .05, neutral: .05, contradiction: .9 }));
   expect(await value.verify(request())).toMatchObject({ accepted: false, reason: "contradictory_pair" });

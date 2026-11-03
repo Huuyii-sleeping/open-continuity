@@ -12,6 +12,7 @@ import { DenseRetriever } from "../../src/core/retrieval/dense/retriever.js";
 import type { DensePairVerifier } from "../../src/core/retrieval/dense/verification/contracts.js";
 import type { EmbeddingProvider } from "../../src/core/retrieval/dense/index-contracts.js";
 import type { DenseRetrievalExtension } from "../../src/core/retrieval/contracts.js";
+import type { CandidateReranker } from "../../src/core/retrieval/reranking/contracts.js";
 import type { MemoryEvent, RecallResult, RememberInput, ResolvedMemory } from "../../src/shared/types.js";
 import { latencySummary, mean, ratio, scoreRanking } from "../baseline/metrics.js";
 
@@ -56,11 +57,21 @@ export async function seedDenseEvaluation(file: string): Promise<DenseEvaluation
     return { cases, events, fingerprint: createHash("sha256").update(JSON.stringify(events)).digest("hex") };
   } finally { await service.close(); rmSync(root, { recursive: true, force: true }); }
 }
-export async function evaluateDense(provider: EmbeddingProvider, file: string, mode: "off" | "miss_only" | "hybrid", createVerifier?: () => Promise<DensePairVerifier & { warmup(): Promise<void> }>, seed?: DenseEvaluationSeed, ranking: "optimized" | "legacy" = "optimized") {
+export interface DenseEvaluationOptions { candidateSelection?: "score_gate" | "bidirectional_rescue"; maxVerificationCandidates?: number;
+  createReranker?: () => Promise<CandidateReranker & { warmup(): Promise<void> }>; rerankingCandidateLimit?: number; }
+export async function evaluateDense(provider: EmbeddingProvider, file: string, mode: "off" | "miss_only" | "hybrid", createVerifier?: () => Promise<DensePairVerifier & { warmup(): Promise<void> }>, seed?: DenseEvaluationSeed, ranking: "optimized" | "legacy" = "optimized", options: DenseEvaluationOptions = {}) {
+  const candidateSelection = options.candidateSelection ?? "score_gate";
+  if (!["score_gate", "bidirectional_rescue"].includes(candidateSelection) || (candidateSelection === "bidirectional_rescue" && (mode !== "hybrid" || !createVerifier))
+    || (options.maxVerificationCandidates !== undefined && (!Number.isInteger(options.maxVerificationCandidates) || options.maxVerificationCandidates < 1 || options.maxVerificationCandidates > 4))
+    || (options.createReranker !== undefined && typeof options.createReranker !== "function")
+    || (mode !== "off" && options.createReranker && candidateSelection !== "bidirectional_rescue")
+    || (options.rerankingCandidateLimit !== undefined && (!options.createReranker || !Number.isInteger(options.rerankingCandidateLimit) || options.rerankingCandidateLimit < 1 || options.rerankingCandidateLimit > 20)))
+    throw new Error("Invalid Dense evaluation selection or verification budget");
   const fixture = seed ?? await seedDenseEvaluation(file);
   const root = mkdtempSync(join(tmpdir(), "oc-fictional-dense-eval-"));
   let store: SqliteMemoryStore | undefined;
   let pairVerifier: (DensePairVerifier & { warmup(): Promise<void> }) | undefined;
+  let reranker: (CandidateReranker & { warmup(): Promise<void> }) | undefined;
   let dense: DenseRetriever | undefined;
   let service: MemoryService | undefined;
   try {
@@ -74,8 +85,14 @@ export async function evaluateDense(provider: EmbeddingProvider, file: string, m
     pairVerifier = mode !== "off" && createVerifier ? await createVerifier() : undefined;
     if (pairVerifier) await pairVerifier.warmup();
     const verifierPreparationMs = pairVerifier ? performance.now() - preparationStarted : 0;
+    const rerankerPreparationStarted = performance.now();
+    reranker = mode !== "off" && options.createReranker ? await options.createReranker() : undefined;
+    if (reranker) await reranker.warmup();
+    const rerankerPreparationMs = reranker ? performance.now() - rerankerPreparationStarted : 0;
     dense = mode === "off" ? undefined : new DenseRetriever(index!, provider, {
-      mode, ...(pairVerifier ? { pairVerifier } : {}), admission: { version: "dense-admission-v1", modelFingerprint: provider.model.fingerprint, minScore: .62, minMargin: .14, minimumCandidates: 2 } });
+      mode, candidateSelection, ...(options.maxVerificationCandidates === undefined ? {} : { maxVerificationCandidates: options.maxVerificationCandidates }),
+      ...(reranker ? { reranking: { reranker, candidateLimit: options.rerankingCandidateLimit ?? 20 } } : {}), ...(pairVerifier ? { pairVerifier } : {}),
+      admission: { version: "dense-admission-v1", modelFingerprint: provider.model.fingerprint, minScore: .62, minMargin: .14, minimumCandidates: 2 } });
     // Observe every retrieval before Query packs its evidence and drops channel-level receipts.
     // Runtime fail-open is correct for clients, but unavailable inference is not a scored rejection.
     const activeDense = dense;
@@ -84,9 +101,10 @@ export async function evaluateDense(provider: EmbeddingProvider, file: string, m
       synchronize: activeDense.synchronize.bind(activeDense), close: () => activeDense.close(),
       retrieve: async (...args) => {
         const batch = await activeDense.retrieve(...args);
-        if (batch.skippedReason === "dense_unavailable" || batch.skippedReason === "dense_index_incomplete"
-          || batch.dense?.reason === "verification_unavailable"
-          || batch.dense?.pairs?.some(pair => pair.reason === "verification_unavailable")) {
+        if (batch.skippedReason === "dense_unavailable" || batch.skippedReason === "dense_index_incomplete" || batch.dense?.reason === "index_changed"
+          || batch.dense?.reason === "verification_unavailable" || batch.dense?.reason === "reranking_unavailable"
+          || batch.dense?.pairs?.some(pair => pair.reason === "verification_unavailable")
+          || batch.dense?.reversePairs?.some(pair => pair.reason === "verification_unavailable")) {
           throw new Error("Dense inference or index unavailable during quality evaluation; cannot count runtime fallback as a correct rejection");
         }
         return batch;
@@ -98,9 +116,14 @@ export async function evaluateDense(provider: EmbeddingProvider, file: string, m
       const current = new Map(entries);
       const input = { userId: item.writes[0]!.userId, agentId: "quality-reader", query: item.query, includePrivate: false, limit: item.limit ?? 8 };
       if (dense) {
-        const indexed = await service.synchronizeDenseIndex(input);
-        if (indexed.failed || indexed.remaining) throw new Error("Dense evaluation requires a complete, successfully computed index; unavailable model is not a quality result");
-        indexing.push({ id: item.id, ...indexed });
+        const totals = { attempted: 0, indexed: 0, stale: 0, failed: 0, remaining: 0, batches: 0 };
+        do {
+          const indexed = await service.synchronizeDenseIndex(input); totals.batches++;
+          totals.attempted += indexed.attempted; totals.indexed += indexed.indexed; totals.stale += indexed.stale; totals.failed += indexed.failed; totals.remaining = indexed.remaining;
+          if (indexed.failed || (indexed.remaining && indexed.indexed === 0) || totals.attempted > 10000)
+            throw new Error("Dense evaluation requires a complete, successfully computed index; unavailable model or stalled indexing is not a quality result");
+        } while (totals.remaining);
+        indexing.push({ id: item.id, ...totals });
       }
       for (const endpoint of ["recall", "context", "query"] as const) {
         const rounds: DenseEvaluationRound[] = [];
@@ -120,6 +143,8 @@ export async function evaluateDense(provider: EmbeddingProvider, file: string, m
           const passed = scores.miss.numerator === 0 && scores.falseSelection.numerator === 0 && !scores.forbiddenSelected.length && valueMatches
             && (!item.expected.ordered || isDeepStrictEqual(selected.slice(0, item.expected.ordered.length), item.expected.ordered));
           const retrieval = "contextPack" in result ? result.contextPack.retrieval : result.retrieval;
+          if (retrieval?.channelResults?.some(batch => batch.channel === "dense" && (batch.dense?.reason === "index_changed" || batch.skippedReason === "dense_unavailable")))
+            throw new Error("Dense evidence invalidated after retrieval; cannot count fallback as a correct rejection");
           if (pairVerifier && retrieval?.channelResults?.some(batch => batch.dense?.pairs?.some(pair => pair.reason === "verification_unavailable")))
             throw new Error("Verifier unavailable during warm quality evaluation; cannot count missing inference as a correct rejection");
           rounds.push({ round, selected, passed, elapsedMs, valueMatches, scores, channelResults: retrieval?.channelResults });
@@ -140,12 +165,17 @@ export async function evaluateDense(provider: EmbeddingProvider, file: string, m
         securityLeakage: ratio(group.filter(row => row.category === "security_boundary" && row.rounds.some(round => round.scores.forbiddenSelected.length)).length, group.filter(row => row.category === "security_boundary").length),
         stability: ratio(group.filter(row => row.stable).length, group.length), latency: latencySummary(group.flatMap(row => row.rounds.map(round => round.elapsedMs))) }];
     }));
-    return { sourceLedgerFingerprint: fixture.fingerprint, ranking, verifier: pairVerifier?.fingerprint() ?? null, verifierPreparationMs, dataset: file.split("/").at(-1), sha256: createHash("sha256").update(readFileSync(file)).digest("hex"), mode,
+    return { sourceLedgerFingerprint: fixture.fingerprint, ranking, candidateSelection, maxVerificationCandidates: options.maxVerificationCandidates ?? (candidateSelection === "bidirectional_rescue" ? 4 : 1),
+      reranker: reranker?.fingerprint() ?? null, rerankingCandidateLimit: reranker ? options.rerankingCandidateLimit ?? 20 : null, rerankerPreparationMs,
+      verifier: pairVerifier?.fingerprint() ?? null, verifierPreparationMs, dataset: file.split("/").at(-1), sha256: createHash("sha256").update(readFileSync(file)).digest("hex"), mode,
       model: provider.model, frozenPolicy: { minScore: .62, minMargin: .14, minimumCandidates: 2 }, indexing, summary, rows };
   } finally {
     if (service) await service.closeGracefully(30000);
     else {
-      try { if (dense) await dense.close(); else await pairVerifier?.close(); }
+      try { if (dense) await dense.close(); else {
+        const settled = await Promise.allSettled([pairVerifier?.close(), reranker?.close()]);
+        const failure = settled.find(result => result.status === "rejected"); if (failure?.status === "rejected") throw failure.reason;
+      } }
       finally { await store?.close(); }
     }
     rmSync(root, { recursive: true, force: true });

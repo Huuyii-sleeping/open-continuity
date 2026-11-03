@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { OpenContinuityError } from "../../shared/errors.js";
+import { registerSqliteLexicalFunctions, sqliteLexicalIndexMigration } from "./lexical-index.js";
 
 const SQLITE_BUSY_RETRY_MS = 25;
 const SQLITE_BUSY_TIMEOUT_MS = 10_000;
@@ -89,6 +90,7 @@ const migrations: ReadonlyArray<ReadonlyArray<string>> = [
     "ALTER TABLE memory_events ADD COLUMN fact TEXT",
     "CREATE INDEX memories_current_fact_group_idx ON memories_current (user_id, scope, scope_identity, kind, fact_group, updated_at DESC, id DESC)",
   ],
+  sqliteLexicalIndexMigration,
 ];
 
 export const LATEST_SQLITE_SCHEMA_VERSION = migrations.length;
@@ -120,6 +122,7 @@ function withBusyRetry<T>(operation: () => T): T {
 }
 
 export function configureSqlite(database: DatabaseSync): void {
+  registerSqliteLexicalFunctions(database);
   database.exec("PRAGMA busy_timeout = 5000");
   withBusyRetry(() => database.exec("PRAGMA journal_mode = WAL"));
   database.exec("PRAGMA synchronous = NORMAL");
@@ -127,6 +130,7 @@ export function configureSqlite(database: DatabaseSync): void {
 }
 
 export function migrateSqlite(database: DatabaseSync): void {
+  registerSqliteLexicalFunctions(database);
   withBusyRetry(() => {
     database.exec("BEGIN IMMEDIATE");
     try {

@@ -15,6 +15,7 @@ import { rememberInMemory } from "./writes/remember.js";
 
 
 export class InMemoryStore implements MemoryStore, MemoryRepository, CandidateSearchStore {
+  readonly handoffReviewVersion = "handoff-review-v1" as const;
   readonly candidateReaders = createInMemoryCandidateReaders({
     current: () => this.resolved.values(),
     belongsToUser: (memory, userId) => this.belongsToUser(memory, userId),

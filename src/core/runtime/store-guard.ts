@@ -12,6 +12,8 @@ export function guardMemoryStore(store: MemoryStore, readStore: GuardedRead): Me
   }
   const candidateReaders: CandidateReaderSet = Object.freeze(wrapped);
   return {
+    ...(store.handoffReviewVersion ? { handoffReviewVersion: store.handoffReviewVersion } : {}),
+    ...(store.lexicalIndexVersion ? { lexicalIndexVersion: store.lexicalIndexVersion } : {}),
     ...(store.lexicalFallbackVersion ? { lexicalFallbackVersion: store.lexicalFallbackVersion } : {}),
     appendRemember: input => store.appendRemember(input), appendForget: (...args) => store.appendForget(...args),
     recall: input => readStore("lookup", () => store.recall(input)), history: input => readStore("history", () => store.history(input)),

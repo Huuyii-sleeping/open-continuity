@@ -28,6 +28,10 @@ describe("modular Core dependencies", () => {
       { from: "src/core/runtime/deadline.ts", to: "src/core/runtime/read-runtime.ts" },
       { from: "src/core/context/selection/relevance.ts", to: "src/core/context/selection/legacy.ts" },
       { from: "src/core/runtime/store-guard.ts", to: "src/core/runtime/read-runtime.ts" },
+      { from: "src/core/retrieval/reranking/local-reranker.ts", to: "src/core/retrieval/dense/rescue.ts" },
+      { from: "src/core/retrieval/reranking/validation.ts", to: "src/core/facts/resolution.ts" },
+      { from: "src/core/retrieval/dense/reranking/order.ts", to: "src/core/retrieval/reranking/local-reranker.ts" },
+      { from: "src/core/retrieval/dense/reranking/selection.ts", to: "src/core/runtime/model-owner.ts" },
     ];
     expect(boundaryViolations(edges)).toHaveLength(edges.length);
   });
@@ -37,6 +41,9 @@ describe("modular Core dependencies", () => {
       { from: "src/core/context/pack.ts", to: "src/core/retrieval/contracts.ts" },
       { from: "src/core/retrieval/candidates.ts", to: "src/core/retrieval/retrievers/full-text.ts" },
       { from: "src/storage/sqlite/readers/exact.ts", to: "src/storage/sqlite/readers/eligibility.ts" },
+      { from: "src/core/retrieval/reranking/local-reranker.ts", to: "src/core/runtime/model-owner.ts" },
+      { from: "src/core/retrieval/dense/reranking/order.ts", to: "src/core/retrieval/reranking/contracts.ts" },
+      { from: "src/core/retrieval/dense/reranking/selection.ts", to: "src/core/retrieval/dense/rescue/contracts.ts" },
     ])).toEqual([]);
   });
 });

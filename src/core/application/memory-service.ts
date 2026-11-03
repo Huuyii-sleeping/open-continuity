@@ -5,6 +5,8 @@ import { InMemoryStore } from "../../storage/inmemory/store.js";
 import { ContextPackBuilder, type ContextPackPolicy } from "../context/pack.js";
 import { type MemoryStore } from "../memory/contracts.js";
 import { createHandoffRecord, resumeHandoffRecord } from "../memory/handoff.js";
+import { confirmedHandoffInput, handoffPrepareInputSchema, prepareHandoffRecord, type HandoffConfirmInput, type HandoffPrepareInput } from "../memory/handoff/review.js";
+import { HANDOFF_REVIEW_VERSION } from "../memory/handoff/contracts.js";
 import { AgenticQueryEngine, resolveAgenticQueryPolicy, type AgenticQueryPolicy } from "../query/engine.js";
 import { RetrievalPipeline, type RetrievalPipelineOptions } from "../retrieval/pipeline.js";
 import { ReadDeadline, ReadRuntime, type ReadRuntimeObserver, type ReadRuntimePolicy } from "../runtime/read-runtime.js";
@@ -35,6 +37,10 @@ export class MemoryService {
     this.agenticQuery = new AgenticQueryEngine(reads, this.retrieval, this.contextPack.capabilityPolicy(), this.agenticQueryPolicy);
   }
   supportsFactDeclarations(): boolean { return typeof this.store.readFactGroup === "function"; }
+  supportsReviewedHandoff(): boolean { return this.store.handoffReviewVersion === HANDOFF_REVIEW_VERSION; }
+  private requireReviewedHandoff() {
+    if (!this.supportsReviewedHandoff()) throw new OpenContinuityError("VALIDATION_ERROR", "Store does not support atomic reviewed handoffs", 400);
+  }
   retrievalCapabilityPolicy() { return this.retrieval.capabilityPolicy(); }
   contextCapabilityPolicy() { return this.contextPack.capabilityPolicy(); }
   readRuntimeCapabilities() { return this.runtime.capabilities(); }
@@ -63,6 +69,15 @@ export class MemoryService {
   async forget(input: ForgetInput) { const value = forgetInputSchema.parse(input); return this.runtime.write(() => this.store.appendForget(value.userId, value.agentId, value.memoryId, value.taskId, value.includePrivate)); }
   async history(input: HistoryInput) { const parsed = historyInputSchema.parse(input); return this.runtime.run("history", async () => this.runtime.guard(this.store).history(parsed)); }
   async createHandoff(input: HandoffCreateInput) { const value = handoffCreateInputSchema.parse(input); return createHandoffRecord(value, input => this.remember(input)); }
+  async prepareHandoff(input: HandoffPrepareInput) {
+    this.requireReviewedHandoff();
+    const value = handoffPrepareInputSchema.parse(input);
+    return this.runtime.run("handoff_prepare", () => prepareHandoffRecord(value, this.retrieval));
+  }
+  async confirmHandoff(input: HandoffConfirmInput) {
+    this.requireReviewedHandoff();
+    return this.createHandoff(confirmedHandoffInput(input));
+  }
   async resumeHandoff(input: HandoffResumeInput) { const value = handoffResumeInputSchema.parse(input); return this.runtime.run("handoff_resume", () => resumeHandoffRecord(value, this.retrieval)); }
   async close() {
     if (this.closePromise) return this.closePromise;

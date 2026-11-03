@@ -3,6 +3,9 @@ import type { MemoryPersistence, LegacyMemoryLookup, MemoryRepository } from "./
 import type { CandidateReaderSet, CandidateSearchStore } from "../retrieval/contracts.js";
 import type { FactGroupStore } from "../facts/contracts.js";
 export interface MemoryStore extends MemoryPersistence, LegacyMemoryLookup {
+  /** Explicit support for the atomic reviewed-Handoff snapshot guard. */
+  readonly handoffReviewVersion?: "handoff-review-v1";
+  readonly lexicalIndexVersion?: "json-literal-values-v1";
   readonly lexicalFallbackVersion?: "latin-one-edit-v1";
   // Optional on legacy/custom implementations; concrete stores implement MemoryRepository.
   list?: MemoryRepository["list"];

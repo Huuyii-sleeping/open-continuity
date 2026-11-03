@@ -53,7 +53,7 @@ try {
 
   const cli = join(installDirectory, "node_modules", ".bin", "open-continuity");
   const demo = JSON.parse(execFileSync(cli, ["demo", "--json"], { encoding: "utf8" }));
-  if (demo.ok !== true || demo.tools !== 9 || demo.handoff?.status !== "ready") {
+  if (demo.ok !== true || demo.tools !== 11 || demo.handoff?.status !== "ready") {
     throw new Error("Installed package demo did not satisfy the release smoke contract");
   }
 
@@ -87,6 +87,14 @@ process.exit(2);
     PATH: `${fakeBin}${delimiter}${process.env.PATH || ""}`,
   };
   execFileSync(cli, ["init", "--json"], { env, encoding: "utf8" });
+  const taskInput = join(directory, "fictional-task.json"), draftPath = join(directory, "fictional-handoff.json");
+  writeFileSync(taskInput, JSON.stringify({ taskId: "fictional-package-handoff", summary: "Fictional JSON export is complete; CSV remains", decisions: ["Remain offline"], nextActions: ["Confirm timezone, then implement CSV"], blockedBy: ["Timezone undecided"] }));
+  const prepared = JSON.parse(execFileSync(cli, ["handoff", "prepare", "--input", taskInput, "--output", draftPath, "--agent", "codex", "--share", "--json"], { env, encoding: "utf8" }));
+  const waiting = JSON.parse(execFileSync(cli, ["handoff", "resume", "fictional-package-handoff", "--agent", "claude", "--json"], { env, encoding: "utf8" }));
+  if (waiting.status !== "not_found") throw new Error("Unconfirmed package draft became visible");
+  execFileSync(cli, ["handoff", "confirm", draftPath, "--agent", "codex", "--yes", "--reviewed", prepared.draft.fingerprint, "--json"], { env, encoding: "utf8" });
+  const handed = JSON.parse(execFileSync(cli, ["handoff", "resume", "fictional-package-handoff", "--agent", "claude", "--json"], { env, encoding: "utf8" }));
+  if (handed.status !== "ready" || handed.capsule.sourceAgentId !== "codex" || handed.capsule.blockedBy[0] !== "Timezone undecided") throw new Error("Installed reviewed handoff failed");
   const claude = JSON.parse(execFileSync(cli, ["setup", "claude", "--workspace", workspace, "--json"], { env, encoding: "utf8" }));
   if (claude.ok !== true || claude.doctor?.ok !== true || claude.steps?.capture?.enabled !== true || claude.steps?.injection?.enabled !== true) {
     throw new Error("Installed package Claude Adapter setup did not satisfy the release smoke contract");
@@ -101,6 +109,7 @@ process.exit(2);
     install: "isolated temporary prefix",
     modularCore,
     demo: { tools: demo.tools, sharedMemory: demo.sharedMemory?.persistedAcrossAgentRestart, handoff: demo.handoff.status },
+    reviewedHandoff: { preparedWithoutWrite: true, userConfirmed: true, resumedAcrossAgents: true },
     claudeAdapter: { setup: claude.ok, doctor: claude.doctor.ok, capture: claude.steps.capture.enabled, injection: claude.steps.injection.enabled },
     governance: { conversationRetentionDays: governance.policies.conversationRetentionDays, longTermMemoryPreserved: governance.longTermMemory.preservedByTransientCleanup },
     cleanup: "complete",

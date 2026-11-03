@@ -1,0 +1,477 @@
+{
+  "version": "candidate-v1",
+  "description": "Fictional literal-value regression pool. Existing candidate contract format; independent frozen judgments for serialization/normalization, raw value retention and access boundaries. Not a blind holdout or semantic evaluation.",
+  "cases": [
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-path",
+        "status": "required",
+        "category": "literal-value",
+        "query": "C:\\orbit\\report",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional-note",
+            "value": "fictional C:\\orbit\\report"
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": "fictional C:\\orbit\\report",
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-nested-path",
+        "status": "required",
+        "category": "literal-value",
+        "query": "C:\\orbit\\nested",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional-note",
+            "value": {
+              "route": "fictional C:\\orbit\\nested"
+            }
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": {
+                "route": "fictional C:\\orbit\\nested"
+              },
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-quote",
+        "status": "required",
+        "category": "literal-value",
+        "query": "dock\"",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional-note",
+            "value": "fictional orbital \"dock\""
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": "fictional orbital \"dock\"",
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-newline-noise",
+        "status": "required",
+        "category": "serialization-noise",
+        "query": "nmarker",
+        "memories": [
+          {
+            "label": "noise",
+            "key": "fictional-note",
+            "value": "fictional\nmarker"
+          }
+        ],
+        "expected": {
+          "relevant": [],
+          "forbidden": [
+            "noise"
+          ],
+          "values": []
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-tab-noise",
+        "status": "required",
+        "category": "serialization-noise",
+        "query": "telescopic",
+        "memories": [
+          {
+            "label": "noise",
+            "key": "fictional-note",
+            "value": "fictional \telescopic"
+          }
+        ],
+        "expected": {
+          "relevant": [],
+          "forbidden": [
+            "noise"
+          ],
+          "values": []
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-carriage-noise",
+        "status": "required",
+        "category": "serialization-noise",
+        "query": "rpark",
+        "memories": [
+          {
+            "label": "noise",
+            "key": "fictional-note",
+            "value": "fictional\rpark"
+          }
+        ],
+        "expected": {
+          "relevant": [],
+          "forbidden": [
+            "noise"
+          ],
+          "values": []
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-plain-control",
+        "status": "required",
+        "category": "literal-value",
+        "query": "nebula",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional-note",
+            "value": "fictional nebula"
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": "fictional nebula",
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-object-key-control",
+        "status": "required",
+        "category": "literal-value",
+        "query": "language",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional-note",
+            "value": {
+              "language": "fictional TypeScript"
+            }
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": {
+                "language": "fictional TypeScript"
+              },
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-short-quote",
+        "status": "required",
+        "category": "literal-value",
+        "query": "v\"",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional-note",
+            "value": "fictional v\""
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": "fictional v\"",
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-nul-tail",
+        "status": "required",
+        "category": "literal-value",
+        "query": "satellite",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional-note",
+            "value": "fictional\u0000satellite"
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": "fictional\u0000satellite",
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-nul-noise",
+        "status": "required",
+        "category": "serialization-noise",
+        "query": "u0000marker",
+        "memories": [
+          {
+            "label": "noise",
+            "key": "fictional-note",
+            "value": "fictional\u0000marker"
+          }
+        ],
+        "expected": {
+          "relevant": [],
+          "forbidden": [
+            "noise"
+          ],
+          "values": []
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-typed-object",
+        "status": "required",
+        "category": "literal-value",
+        "query": "enabled true -12.5 null",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional-note",
+            "value": {
+              "enabled": true,
+              "temperature": -12.5,
+              "missing": null,
+              "tags": [
+                "fictional azure"
+              ]
+            }
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": {
+                "enabled": true,
+                "temperature": -12.5,
+                "missing": null,
+                "tags": [
+                  "fictional azure"
+                ]
+              },
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-nul-key",
+        "status": "required",
+        "category": "literal-value",
+        "query": "satellite",
+        "memories": [
+          {
+            "label": "target",
+            "key": "fictional\u0000satellite",
+            "value": "fictional value"
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "target"
+          ],
+          "forbidden": [],
+          "values": [
+            {
+              "label": "target",
+              "value": "fictional value",
+              "version": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "channel": "full_text",
+      "sqliteOnlyRequired": true,
+      "requireUserConfirmed": true,
+      "spec": {
+        "id": "literal-boundaries",
+        "status": "required",
+        "category": "security",
+        "query": "C:\\orbit\\allowed",
+        "limit": 1,
+        "memories": [
+          {
+            "label": "allowed",
+            "key": "fictional-note",
+            "value": "fictional C:\\orbit\\allowed"
+          },
+          {
+            "label": "other-user",
+            "key": "fictional-other-user",
+            "value": "fictional C:\\orbit\\allowed fictional C:\\orbit\\allowed",
+            "userId": "baseline-other-user"
+          },
+          {
+            "label": "other-agent",
+            "key": "fictional-other-agent",
+            "value": "fictional C:\\orbit\\allowed fictional C:\\orbit\\allowed",
+            "scope": "agent",
+            "agentId": "baseline-other-agent"
+          },
+          {
+            "label": "other-task",
+            "key": "fictional-other-task",
+            "value": "fictional C:\\orbit\\allowed fictional C:\\orbit\\allowed",
+            "scope": "task",
+            "taskId": "fictional-other-task"
+          },
+          {
+            "label": "private",
+            "key": "fictional-private",
+            "value": "fictional C:\\orbit\\allowed fictional C:\\orbit\\allowed",
+            "sensitivity": "private"
+          },
+          {
+            "label": "pending",
+            "key": "fictional-pending",
+            "value": "fictional C:\\orbit\\allowed fictional C:\\orbit\\allowed",
+            "userConfirmed": false
+          }
+        ],
+        "expected": {
+          "relevant": [
+            "allowed"
+          ],
+          "forbidden": [
+            "other-user",
+            "other-agent",
+            "other-task",
+            "private",
+            "pending"
+          ],
+          "values": [
+            {
+              "label": "allowed",
+              "value": "fictional C:\\orbit\\allowed",
+              "version": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -6,6 +6,14 @@ All notable changes to OpenContinuity are documented here. The project follows S
 
 ### Fixed
 
+- Update the locked MIT-licensed `@hono/node-server` dependency from 2.1.1 to 2.1.6 to address GHSA-rmxm-3fg6-px4f; keep the MCP SDK and public dependency ranges unchanged.
+
+- Add opt-in bidirectional Dense rescue with an independent bounded window, original top-hit preservation, nearest-neighbour contradiction veto and unique mutual support. Bind direction to verifier evidence/caches and audit reverse work and partial windows. Default lexical/score-gate behavior remains unchanged, with no new inference dependency or Adapter change.
+- Add rescue/permission/deadline/cursor regressions and paired model evaluation, retaining original labels, rejected ablations and exposed challenges. Reject stale generations and unavailable reverse inference before scoring. Quality gains remain modest; existing wrong selections are retained.
+
+- SQLite schema 5 indexes decoded JSON literal values and field names, avoiding escaped-path/quote misses and serialization-only false matches. Preserve authoritative values/events; add stable integer FTS row pointers, transactional migration/rebuild and content-change-only trigger maintenance. SQLite scored cursors bind `lexicalIndexVersion`; restart pagination after migration. Candidate receipts and actual capability discovery expose the index version additively. Other stores retain their declared substring compatibility paths.
+- Add separate literal-value regressions and cross-store retry/CAS/history/reopen tests, plus SQLite migration rollback, pointer rollback, VACUUM backup/restore and imported-ID replacement coverage. Existing quality judgments and permissions are unchanged; import still requires an empty target. New synthetic results and write/import costs are reported separately from semantic challenges.
+
 - Dense quality evaluation now rejects unavailable query embedding, pair inference, incomplete indexes and Query deadlines before scoring, including Query calls whose final pack omits channel receipts. Add nine fictional inference and lifecycle regressions; genuine model rejection remains scoreable. Disabled control arms never allocate a verifier, invalid judgments are checked before model allocation, and failed warmup/construction releases initialized owners. Include all Dense evaluation entry points in strict typechecking and explicitly type report rows.
 
 ### Removed
@@ -13,6 +21,14 @@ All notable changes to OpenContinuity are documented here. The project follows S
 - Withdraw the unreleased manual term-alias experiment, its constructor option, explanations/capabilities, and dedicated evaluation command. Stale `termAliases` constructor settings now fail explicitly; default literal retrieval and its cursor fingerprints remain. No persisted schema or database migration. Automatic model-assisted query rewriting remains unimplemented.
 
 ### Added
+
+- Add reviewed Handoff preparation/confirmation to Core, MCP and HTTP, plus normal CLI prepare/review/confirm/resume commands. Drafts are read-only with respect to long-term memory, default private, content/identity/target-bound and valid for24 hours. Source Agents must present the draft before explicit user approval; no transcript harvesting or default model dependency.
+- Add built-in atomic target-ID/source-event/version checks inside the existing write transaction or JSON compatibility lock, retaining original idempotent receipts across later writes and Forget. Custom stores must explicitly implement `handoffReviewVersion`; capability discovery reports actual support. Keep Capsule1.0 and SQL schemas, recording review metadata in the event ledger.
+- Add cross-store review/ABA/private/idempotency, CLI, HTTP authorization and independent MCP process regressions, and installed-package reviewed Handoff smoke. Real model task performance remains separate from protocol evidence.
+
+- Add opt-in query/document relevance reranking over at most 20 authorized Dense candidates. Preserve the original verified selection on normal rejection; unavailable inference remains an explicit failure. Separate model ownership, source/query/access-bound scores, pure ordering and two-phase selection; keep original cosine/NLI admission and shared deadlines.
+- Add raw Cross-Encoder score and original cosine-rank evidence, bounded verification-phase receipts, and configuration-based rerank capability discovery. Model/policy/window changes invalidate experimental cursors; default fingerprints, service wiring and production dependencies remain unchanged.
+- Add independent reranker, ordering, selection, lifecycle, invalidation and evaluation regressions plus a fictional 248-memory candidate-window challenge. Batch evaluation indexing with progress checks; keep original labels and distinguish ranking diagnostics, final recall, false selections and no-answer false matches.
 
 - Separate Dense ranking, access/revision-bound snapshot caching, and local model-veto lifecycle into independent modules. SQLite projects authorized vectors and hydrates only bounded current references; vector-table triggers invalidate cached generations. Default factories remain lexical and install no inference dependency.
 - Add typed, source-event/version/access/content/query-bound verifier receipts and carry accepted evidence through existing Recall/Context/Query paths. Budgeted candidates and unavailable verification remain distinguishable; experimental policies evolve their fingerprints, with default cursors unchanged.

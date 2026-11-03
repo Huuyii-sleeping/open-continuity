@@ -1,8 +1,16 @@
 # Retrieval Core 分阶段演进
 
+先看[项目当前状态与下一步](../project-status.md)：各阶段已交付的职责、默认与实验能力、最新问题和跨Agent接力验收范围。以下文档分别保留各次历史设计与证据。
+
+- 最新[独立相关性重排设计](./relevance-reranking.md)分开候选相关性排序与支持验证，并保留已验证基线；[质量/安全/稳定性/成本验收](./relevance-reranking-validation.md)分别展示真实改进与未解决问题。只装配到显式 Dense 实验，默认仍关闭。
+
+- 最新[双向补召回设计](./dense-rescue.md)把排名候选与模型准入拆开；[分项验收](./dense-rescue-validation.md)同时保留失败扩窗、原标注和错误数，默认仍关闭。
+
 本目录是 OpenContinuity RAG 内核的阶段性设计与验收入口。这里记录的是可复核的工程事实，不用路线图能力替代当前实现，也不把单次实验结果写成产品能力。
 
 ## 当前状态
+
+- [SQLite 字面值索引](./sqlite-literal-index.md)：原始值与检索投影分离，Schema 5 使用稳定整数指针维护 FTS，内容未变时省去重建。路径/引号/转义噪声回归、原质量、权限/迁移/回滚及写入成本分开验收，既有语义 Challenge 和默认关闭模型策略保持。
 
 - 最新[向量投影缓存与模型验证](./embedding-optimization.md)分别实现排名/缓存/模型回执；[验收](./embedding-optimization-validation.md)按共享账本与三轮容量配对记录热查询改善，保留冷启动、错选/误拒绝和验证模型资源失败。默认关闭。
 

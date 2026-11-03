@@ -48,6 +48,7 @@ export interface RuntimeCapabilities {
     };
   };
   retrieval: {
+    lexicalIndexVersion?: "json-literal-values-v1" | null;
     lexicalFallback?: { supported: boolean; enabled: boolean; version: "latin-one-edit-v1" | null; limits: typeof LEXICAL_FALLBACK_LIMITS | null };
     mode: "hybrid";
     channels: readonly RetrievalChannel[];
@@ -62,8 +63,8 @@ export interface RuntimeCapabilities {
     factGroupLimit: number;
     semanticFactResolution: false;
     semantic: boolean;
-    experimentalDense?: { status: "experimental"; mode: "miss_only" | "hybrid"; model: string; policy: string; index: string; verification?: { model: string; policy: string; runtime: string } };
-    rerank: false;
+    experimentalDense?: { status: "experimental"; mode: "miss_only" | "hybrid"; model: string; policy: string; index: string; verification?: { model: string; policy: string; runtime: string }; reranking?: { model: string; policy: string; runtime: string; candidateLimit: number; verificationLimit: number } };
+    rerank: boolean;
     agentic: true;
     graph: false;
   };
@@ -92,7 +93,7 @@ export interface RuntimeCapabilities {
     sufficiency: "budgeted-context-v1";
     answer: { version: "evidence-answer-v1"; mode: "memory_projection"; semanticSynthesis: false; versionCitations: true; historyProjection: false };
   };
-  handoff: { enabled: true; schemaVersion: "1.0"; expiration: true };
+  handoff: { enabled: true; schemaVersion: "1.0"; expiration: true; reviewedDrafts?: boolean; reviewVersion?: "handoff-review-v1" | null };
   deployment: { localOnly: boolean; multiProcess: true; multiInstance: boolean };
 }
 

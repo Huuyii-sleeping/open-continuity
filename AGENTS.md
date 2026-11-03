@@ -49,7 +49,7 @@ Profile 是容量、查询策略和部署边界，不是简单的数据库开关
 - JSON 是兼容/迁移路径，不要继续把新功能建立在 JSON 全量扫描上。
 - 本地版本暂不做云端多租户；稳定本地 `userId`、Agent 身份、workspace allowlist 和 memory scope 仍必须保留。
 - 默认长期数据库位于 `~/.open-continuity/memories.db`，Capture Inbox 使用独立的 `capture.db`；真实数据库、日志、回执、备份和配置不得进入仓库。
-- Lite 默认是确定性混合检索（exact/structured/full-text）和有预算的确定性 Agentic Query。SQLite 已有显式 Core Embedding/Dense 实验（设计与验收见 docs/retrieval-core/embedding-integration.md），默认不加载模型；未验证的保守准入仍有否定误召回；显式模型验证与投影缓存已独立实现，但仍有错选/误拒绝和较强模型资源超标（见 docs/retrieval-core/embedding-optimization.md），不能宣称默认语义能力成熟。semantic reranker、自动语义归并和图谱遍历尚未实现。代码和文档不得把 roadmap 能力写成已实现能力。
+- Lite 默认是确定性混合检索（exact/structured/full-text）和有预算的确定性 Agentic Query。SQLite 已有显式 Core Embedding/Dense 实验（设计与验收见 docs/retrieval-core/embedding-integration.md），默认不加载模型；未验证的保守准入仍有否定误召回；显式模型验证与投影缓存已独立实现，但仍有错选/误拒绝和较强模型资源超标（见 docs/retrieval-core/embedding-optimization.md），不能宣称默认语义能力成熟。显式 Dense 候选相关性重排已独立实验实现（docs/retrieval-core/relevance-reranking.md），默认不启用；相对排序不代表支持、权限或事实判断。通用全通道 semantic reranker、自动语义归并和图谱遍历尚未实现。代码和文档不得把 roadmap 能力写成已实现能力。
 
 ## 4. Adapter 契约与客户端边界
 

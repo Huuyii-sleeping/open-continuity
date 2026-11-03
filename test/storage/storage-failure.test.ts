@@ -75,7 +75,7 @@ describe("SQLite transaction and migration failure evidence", () => {
     expect(database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all()).toEqual([]);
     spy.mockRestore();
     migrateSqlite(database);
-    expect(database.prepare("SELECT version FROM open_continuity_schema_migrations ORDER BY version").all().map((row) => row.version)).toEqual([1, 2, 3, 4]);
+    expect(database.prepare("SELECT version FROM open_continuity_schema_migrations ORDER BY version").all().map((row) => row.version)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("refuses a newer schema without changing stored data", async () => {

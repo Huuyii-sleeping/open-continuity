@@ -1,6 +1,16 @@
 # OpenContinuity 架构与路线图
 
-最新增量见[投影缓存与独立模型验证](./retrieval-core/embedding-optimization.md)：SQL 向量/正文读取拆开，授权快照与版本代次绑定；本地候选验证只消费准入后的证据，回执进入 Recall/Context/Query。原存储权限和默认策略不变。热查询的实际性能改善与模型误拒绝/重量风险分别见[本轮验收](./retrieval-core/embedding-optimization-validation.md)，不表示默认语义 RAG 已成熟。
+最新用户流程增量为[交接草稿与确认](./handoff-workflow.md)：复用既有Handoff，分开准备、用户审核、原子确认和恢复。草稿绑定精确内容/身份/目标快照，默认private；跨Agent需明确public共享。协议、CLI和持久化验收与实际模型接手效果[分开记录](./handoff-workflow-validation.md)，不改变默认Embedding策略。
+
+[当前状态与下一步（2026-10-30）](./project-status.md)把默认能力、显式语义实验、已知问题和阶段证据分开。下一阶段先验证跨Agent任务接力：复用既有Handoff，建立完整使用流程和实际接手结果的独立基线，再据失败决定内核调优。
+
+最新独立增量为[Dense相关性重排](./retrieval-core/relevance-reranking.md)：通用 `retrieval/reranking/` 管理评分模型与绑定回执，`dense/reranking/` 分开排序和最终选择，原验证线路作为可保留的基线。两阶段共用 deadline；相对相关性不决定权限或事实权威。默认关闭，质量、安全、成本与剩余失败见[独立验收](./retrieval-core/relevance-reranking-validation.md)。
+
+最新独立增量为[双向补召回](./retrieval-core/dense-rescue.md)：`dense/rescue.ts`负责保留旧命中、首候选矛盾拒绝、有限窗口双向支持；`retriever.ts`继续负责授权排名、共享 deadline 和索引版本复查。该实验没有默认启用，也不是通用问题 reranker；[验收](./retrieval-core/dense-rescue-validation.md)分别记录工程、质量、安全和成本。
+
+当前 [SQLite 字面值索引增量](./retrieval-core/sqlite-literal-index.md)把权威 JSON 与检索投影分开：原值保持，FTS 索引解码后的字符串/字段/标量，稳定整数指针随事务维护，内容未变时保留索引。Schema 5、实际索引能力与游标迁移独立记录；既有原质量标注不变，语义理解仍是 Challenge。
+
+前一增量见[投影缓存与独立模型验证](./retrieval-core/embedding-optimization.md)：SQL 向量/正文读取拆开，授权快照与版本代次绑定；本地候选验证只消费准入后的证据，回执进入 Recall/Context/Query。原存储权限和默认策略不变。热查询的实际性能改善与模型误拒绝/重量风险分别见[本轮验收](./retrieval-core/embedding-optimization-validation.md)，不表示默认语义 RAG 已成熟。
 
 
 前一独立增量为[Embedding 实验接入](./retrieval-core/embedding-integration.md)：SQLite 事务内的可重建任务/向量、事务外模型计算与版本 CAS、独立 Dense 余弦排名、流式扫描及 RRF/Context/Query 组合已实现。只有显式 Core 装配启用；默认工厂、MCP/HTTP/Hook 配置不加载模型。工程契约通过，保守准入仍有否定误召回，10k 扫描成本较高，[质量与容量验收](./retrieval-core/embedding-integration-validation.md)分别保留失败；模型安装、跨平台、意图判定与默认开启仍是路线图。
@@ -53,7 +63,7 @@ RAG、Agentic Retrieval、多路召回和图谱只是 Read Pipeline 的可插拔
 - [4A Context选择](./retrieval-core/phase-4a-context-selection.md)：默认相关性/Exact层级优先，用途仅同分破平；scope/确认保持资格边界，独立策略和fallback回执可审计。旧加权仅显式兼容；多查询的覆盖装包由4B另外控制，不冒充相关性分数。
 
 - MCP stdio 与 HTTP 两种接入方式。
-- `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`、`memory_handoff_create`、`memory_handoff_resume` 九个工具。
+- `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`、`memory_handoff_create`、`memory_handoff_prepare`、`memory_handoff_confirm`、`memory_handoff_resume` 十一个工具。
 - 本地 CLI 初始化、Agent 连接与断开、只读 doctor、记忆查询/历史/删除。
 - Trae、Claude Code 和 Codex CLI 连接器，写配置前备份并为每个客户端绑定稳定身份。
 - 带版本、当前状态、完整事件和 SHA-256 校验的 Memory Package。
@@ -91,7 +101,7 @@ RAG、Agentic Retrieval、多路召回和图谱只是 Read Pipeline 的可插拔
 
 ### 尚未实现
 
-- embedding、pgvector、语义向量召回和 rerank。
+- 默认开箱语义召回、模型安装交付、Team pgvector 和全通道 semantic rerank；SQLite 显式 Dense 与候选相关性重排实验已实现并保持默认关闭。
 - 基于模型的语义查询规划、知识图谱和关系多跳推理。
 - 基于模型的记忆提取、语义冲突判断、条件化偏好归并和归并撤销；当前 Capture 使用显式信号规则与确定性字符相似度，只做保守去重/替换门禁，不冒充语义理解。
 - 基于模型的语义压缩与特定模型 tokenizer 精确计数。
@@ -334,7 +344,7 @@ memory-package/
 
 人工配置词对实验已撤销，不再提供词典功能。调用方模型生成子查询仍可通过现有 `memory_query.subqueries` 显式提交，但内核尚未实现模型改写，也不保证 Agent 自动调用。
 
-### Retrieval Core 7A：模块化；下一增量独立接入 Embedding
+### Retrieval Core 7A：模块化与后续 Embedding 的历史设计
 
 [最终审查](./retrieval-core/phase-7a-final-audit.md)按模块化职责、失败边界和独立测试进行验收；修复非法候选标签与测试文件/断言矛盾报告，公共排名与权限保持。验收结论只针对当前模块化基础，不将旧语义Challenge或未来模型能力写成已完成。
 
