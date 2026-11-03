@@ -35,8 +35,8 @@ try {
   const source = resolve(values.source!), root = resolve(values["report-dir"]);
   const evaluatorHash = createHash("sha256").update(readFileSync(new URL("./run.ts", import.meta.url))).update(readFileSync(new URL("./metrics.ts", import.meta.url))).digest("hex");
   const before = values.compare ? JSON.parse(readFileSync(resolve(values.compare), "utf8")) as ReliabilityReport : null;
-  const module = await import(pathToFileURL(join(source, "src/core/memory-service.ts")).href) as typeof import("../../src/core/memory-service.js");
-  const sqlite = await import(pathToFileURL(join(source, "src/sqlite/sqlite-memory-store.ts")).href) as typeof import("../../src/sqlite/sqlite-memory-store.js");
+  const module = await import(pathToFileURL(join(source, "src/core/memory-service.ts")).href) as typeof import("../../src/core/application/memory-service.js");
+  const sqlite = await import(pathToFileURL(join(source, "src/sqlite/sqlite-memory-store.ts")).href) as typeof import("../../src/storage/sqlite/sqlite-memory-store.js");
   const fingerprint = sourceHash(source); const rows: ReliabilityRow[] = [];
   mkdirSync(root, { mode: 0o700 }); // No overwrite of previous evidence.
   for (const size of settings.sizes) for (let round = 1; round <= settings.rounds; round++) for (const recordRepeats of settings.recordRepeats) {

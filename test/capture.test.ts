@@ -21,7 +21,7 @@ import {
 import { redactSensitiveText } from "../src/capture/sensitivity.js";
 import type { ConversationItem, ConversationThread } from "../src/capture/types.js";
 import { defaultConfig, saveConfig } from "../src/cli/config.js";
-import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
+import { SqliteMemoryStore } from "../src/storage/sqlite/sqlite-memory-store.js";
 import { FAKE_TRAE_THREAD_ID, installFakeTraeCli } from "./helpers/fake-trae.js";
 
 describe("Trae conversation capture", () => {

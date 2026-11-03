@@ -7,9 +7,9 @@ import { extractMemoryCandidates } from "../../src/capture/candidate-extractor.j
 import { sanitizeConversationItem } from "../../src/capture/sensitivity.js";
 import type { CaptureQuality, ConversationItem } from "../../src/capture/types.js";
 import { defaultConfig, saveConfig } from "../../src/cli/config.js";
-import { MemoryService } from "../../src/core/memory-service.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
 import { runInjectionHook } from "../../src/injection/injection-service.js";
-import { SqliteMemoryStore } from "../../src/sqlite/sqlite-memory-store.js";
+import { SqliteMemoryStore } from "../../src/storage/sqlite/sqlite-memory-store.js";
 import type { MemoryKind, Sensitivity } from "../../src/shared/types.js";
 
 export interface GoldenDataset {

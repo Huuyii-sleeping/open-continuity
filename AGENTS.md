@@ -49,7 +49,7 @@ Profile 是容量、查询策略和部署边界，不是简单的数据库开关
 - JSON 是兼容/迁移路径，不要继续把新功能建立在 JSON 全量扫描上。
 - 本地版本暂不做云端多租户；稳定本地 `userId`、Agent 身份、workspace allowlist 和 memory scope 仍必须保留。
 - 默认长期数据库位于 `~/.open-continuity/memories.db`，Capture Inbox 使用独立的 `capture.db`；真实数据库、日志、回执、备份和配置不得进入仓库。
-- Lite 当前是确定性混合检索（exact/structured/full-text）和有预算的确定性 Agentic Query；尚未实现向量 embedding、semantic reranker、自动语义归并或图谱遍历。代码和文档不得把 roadmap 能力写成已实现能力。
+- Lite 默认是确定性混合检索（exact/structured/full-text）和有预算的确定性 Agentic Query。SQLite 已有显式 Core Embedding/Dense 实验（设计与验收见 docs/retrieval-core/embedding-integration.md），默认不加载模型；未验证的保守准入仍有否定误召回；显式模型验证与投影缓存已独立实现，但仍有错选/误拒绝和较强模型资源超标（见 docs/retrieval-core/embedding-optimization.md），不能宣称默认语义能力成熟。显式 Dense 候选相关性重排已独立实验实现（docs/retrieval-core/relevance-reranking.md），默认不启用；相对排序不代表支持、权限或事实判断。通用全通道 semantic reranker、自动语义归并和图谱遍历尚未实现。代码和文档不得把 roadmap 能力写成已实现能力。
 
 ## 4. Adapter 契约与客户端边界
 
@@ -78,10 +78,10 @@ Profile 是容量、查询策略和部署边界，不是简单的数据库开关
 
 ## 5. 代码组织与实现原则
 
-- `src/core/` 维护记忆、检索、Context Pack、Agentic Query、演化和 scope 规则；不要在这里读取某个 CLI 的原始 transcript。
+- `src/core/` 按 application、memory、policy、runtime、pagination、retrieval、facts、context、query、answer 分模块；application 负责装配，其余模块通过窄契约协作，不依赖具体数据库或某个 CLI 的原始 transcript。文件导航见 `src/core/README.md`。
 - `src/capture/` 维护规范化对话、Inbox、checkpoint、候选和数据治理；`src/injection/` 维护 Hook 输出、预算、回执和客户端 Hook 配置。
 - `src/cli/` 维护用户配置、连接器、setup/doctor 和可操作 CLI；安装器必须保留并备份用户原配置，重复执行应幂等。
-- `src/sqlite/`、`src/postgres/` 负责存储实现和迁移；修改 schema、scope、身份、版本、Memory Package 或 Handoff Capsule 都属于协议/迁移变更。
+- `src/storage/{inmemory,json,sqlite,postgres}/` 负责存储实现；各 backend 的 `readers/` 分开实现召回通道，资格过滤在 top-K 前执行。通用迁移命令位于 `src/cli/storage/`；`src/core/*.ts`、`src/sqlite/*.ts`、`src/postgres/*.ts` 只保留兼容 re-export，新实现不得重新依赖它们。修改 schema、scope、身份、版本、Memory Package 或 Handoff Capsule 都属于协议/迁移变更。
 - 优先使用现有类型、错误码、事务、CAS、幂等键和审计事件；不要用字符串拼接、全量扫描或静默覆盖绕过既有一致性边界。
 - 运行时路径、临时数据库和测试夹具必须由测试显式注入；不要读用户默认 `HOME` 下的真实 Agent 历史来完成单元测试。
 - 新增日志不得输出 Prompt、transcript 原文、tool input/output、真实路径或凭据；必要时只记录脱敏后的计数、字段名、短摘要或指纹。
@@ -93,6 +93,7 @@ Node.js 要求 `22.13+`，使用 npm 和仓库锁文件。常用命令：
 ```bash
 npm ci
 npm run typecheck
+npm run check:architecture
 npm test
 npm run build
 npm run test:soak
@@ -103,6 +104,7 @@ npm run release:check
 ```
 
 - 快速开发至少运行 `npm run typecheck` 和受影响测试；代码、schema、Adapter 或数据治理变更应补对应测试。
+- 内核模块和内部线路分别实现、分别测试；`npm run test:core:list`查看真实清单，`test:core -- --module=<module> --route=<route>`独立运行。结果按模块/线路保留，不把空结果、跳过或跨模块集成成绩当作线路通过。连接/事务、deadline与Context预算继续由明确所有者统一维护。
 - `test/` 验证工程契约、权限、异常、事务、恢复和进程边界；`evals/` 只使用完全虚构数据，验证 Capture 候选质量、Injection 选择质量、治理和延迟。
 - 正式评测门槛是 Capture、Injection、治理场景 100% 通过，安全泄露率为 0，Injection P95 不超过数据集定义门槛；challenge 场景暴露当前检索能力边界，不能为了过门禁降低标注标准。
 - 适配器变更至少覆盖：setup/doctor、Capture 增量与断点、候选审核、Hook 注入、MCP 深搜、失败 fail-open、重复执行和 workspace 隔离。

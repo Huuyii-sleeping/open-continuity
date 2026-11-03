@@ -1,0 +1,548 @@
+{
+  "version": "dense-rescue-challenge-v1",
+  "description": "Entirely fictional author-generated challenge pool, frozen before model inference in this turn. Exposed regression pools informed the rescue policy, so this is not an independent blind holdout. Original thresholds and labels unchanged. Includes paraphrases, negation, conditions, quoted content and missing evidence.",
+  "corpus": [
+    {
+      "id": "draft",
+      "text": "虚构纸鸢编辑器改动稿件之前保存恢复副本。"
+    },
+    {
+      "id": "permit",
+      "text": "虚构石榴助手只在用户批准后保存长期笔记。"
+    },
+    {
+      "id": "network",
+      "text": "虚构雪松记录器默认在本机离线处理资料。"
+    },
+    {
+      "id": "release",
+      "text": "虚构晨星应用发布检查失败时恢复前一个稳定版本。"
+    },
+    {
+      "id": "review",
+      "text": "虚构银杏工具修改代码后运行回归测试。"
+    },
+    {
+      "id": "archive",
+      "text": "虚构珊瑚系统只清理过期的临时回执。"
+    },
+    {
+      "id": "transfer",
+      "text": "虚构沙丘任务换助手前记录进度、阻碍和后续步骤。"
+    },
+    {
+      "id": "schedule",
+      "text": "虚构银帆图书会每周星期四晚上举办。"
+    },
+    {
+      "id": "subject",
+      "text": "虚构蓝鹭项目日志中不得保存用户原始问题。"
+    },
+    {
+      "id": "confirm",
+      "text": "虚构白桦配置覆盖已有文件之前必须由用户确认。"
+    },
+    {
+      "id": "path",
+      "text": "虚构琥珀助手仅能读取用户明确许可的目录。"
+    },
+    {
+      "id": "budget",
+      "text": "虚构雨燕上下文超出预算时省略低优先级条目。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "rescue-draft",
+      "category": "paraphrase",
+      "query": "虚构纸鸢修改文稿前先留下能还原的副本。",
+      "relevant": [
+        "draft"
+      ],
+      "forbidden": [
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-draft",
+      "category": "negation",
+      "query": "虚构纸鸢修改文稿前不需要留还原副本。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-permit",
+      "category": "paraphrase",
+      "query": "虚构石榴长期记录资料要先拿到用户同意。",
+      "relevant": [
+        "permit"
+      ],
+      "forbidden": [
+        "draft",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-permit",
+      "category": "negation",
+      "query": "虚构石榴永久记录资料可以省略用户同意。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-network",
+      "category": "paraphrase",
+      "query": "虚构雪松默认不联网，资料在个人电脑处理。",
+      "relevant": [
+        "network"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-network",
+      "category": "negation",
+      "query": "虚构雪松默认必须把资料传到在线服务器。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-release",
+      "category": "paraphrase",
+      "query": "虚构晨星发布验收没过时回退到上一稳定版。",
+      "relevant": [
+        "release"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-release",
+      "category": "condition",
+      "query": "虚构晨星发布检查成功时必须回退到旧版。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-review",
+      "category": "paraphrase",
+      "query": "虚构银杏更改程序之后执行回归检查。",
+      "relevant": [
+        "review"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-review",
+      "category": "negation",
+      "query": "虚构银杏改过代码后跳过所有回归测试。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-archive",
+      "category": "paraphrase",
+      "query": "虚构珊瑚清理时删除已经到期的短期收据。",
+      "relevant": [
+        "archive"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-archive",
+      "category": "negation",
+      "query": "虚构珊瑚清理时删除尚未到期的所有收据。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-transfer",
+      "category": "paraphrase",
+      "query": "虚构沙丘交接给另一个助手前写下进展、卡点和接下来要做的事。",
+      "relevant": [
+        "transfer"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-transfer",
+      "category": "negation",
+      "query": "虚构沙丘换助手前不写进展或后续步骤。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-schedule",
+      "category": "paraphrase",
+      "query": "虚构银帆读书聚会安排在每周四晚间。",
+      "relevant": [
+        "schedule"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-schedule",
+      "category": "no-evidence",
+      "query": "虚构银帆图书会的会员证编号是多少？",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-subject",
+      "category": "paraphrase",
+      "query": "虚构蓝鹭的日志不能记下使用者完整原文提问。",
+      "relevant": [
+        "subject"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-subject",
+      "category": "negation",
+      "query": "虚构蓝鹭日志必须记下使用者完整原文问题。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-confirm",
+      "category": "paraphrase",
+      "query": "虚构白桦改写现有配置文件前需得到使用者确认。",
+      "relevant": [
+        "confirm"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-confirm",
+      "category": "quoted-content",
+      "query": "“虚构白桦需确认”只是故事引文，不是本次要求。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-path",
+      "category": "paraphrase",
+      "query": "虚构琥珀只能访问使用者已经授权的文件夹。",
+      "relevant": [
+        "path"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "budget"
+      ]
+    },
+    {
+      "id": "reject-path",
+      "category": "negation",
+      "query": "虚构琥珀应读取用户从未授权的文件夹。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    },
+    {
+      "id": "rescue-budget",
+      "category": "paraphrase",
+      "query": "虚构雨燕上下文太长时先移除不重要的记录。",
+      "relevant": [
+        "budget"
+      ],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path"
+      ]
+    },
+    {
+      "id": "reject-budget",
+      "category": "negation",
+      "query": "虚构雨燕上下文过长时仍须全部保留所有条目。",
+      "relevant": [],
+      "forbidden": [
+        "draft",
+        "permit",
+        "network",
+        "release",
+        "review",
+        "archive",
+        "transfer",
+        "schedule",
+        "subject",
+        "confirm",
+        "path",
+        "budget"
+      ]
+    }
+  ]
+}

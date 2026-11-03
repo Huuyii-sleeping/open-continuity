@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { ConversationInbox } from "../src/capture/conversation-inbox.js";
 import type { ConversationThread } from "../src/capture/types.js";
-import { MemoryService } from "../src/core/memory-service.js";
-import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
+import { MemoryService } from "../src/core/application/memory-service.js";
+import { SqliteMemoryStore } from "../src/storage/sqlite/sqlite-memory-store.js";
 
 function thread(source: string, id: string, text: string): ConversationThread {
   return {

@@ -7,8 +7,8 @@ import { performance } from "node:perf_hooks";
 import { extractMemoryCandidates } from "../../src/capture/candidate-extractor.js";
 import { sanitizeConversationItem } from "../../src/capture/sensitivity.js";
 import type { CaptureQuality, ConversationItem } from "../../src/capture/types.js";
-import { MemoryService } from "../../src/core/memory-service.js";
-import { SqliteMemoryStore } from "../../src/sqlite/sqlite-memory-store.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
+import { SqliteMemoryStore } from "../../src/storage/sqlite/sqlite-memory-store.js";
 import type { MemoryKind, Sensitivity } from "../../src/shared/types.js";
 
 export interface QualityDataset {

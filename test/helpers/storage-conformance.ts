@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { MemoryService } from "../../src/core/memory-service.js";
-import { encodeCursor } from "../../src/core/cursor.js";
-import type { MemoryStore } from "../../src/core/memory-store.js";
-import type { MemoryRepository, StructuredMemoryInput } from "../../src/core/storage-contract.js";
-import { storageFingerprint } from "../../src/core/storage-contract.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
+import { encodeCursor } from "../../src/core/pagination/cursor.js";
+import type { MemoryStore } from "../../src/core/memory/contracts.js";
+import type { MemoryRepository, StructuredMemoryInput } from "../../src/core/memory/storage-contract.js";
+import { storageFingerprint } from "../../src/core/memory/storage-contract.js";
 import { recallInputSchema, type RememberInput } from "../../src/shared/types.js";
 
 export interface StorageRuntime {
@@ -20,6 +20,24 @@ function write(key: string, extra: Partial<RememberInput> = {}): RememberInput {
 
 export function storageConformance(label: string, create: () => Promise<StorageRuntime>, limitations: { pgMemReservedJsonKeys?: boolean } = {}) {
   describe(`${label}: storage-contract-v1`, () => {
+    it("preserves literal JSON values through retry, CAS, history and reopen", async () => {
+      const runtime = await create();
+      const value = { path: "C:\\fictional\\orbit", quote: 'fictional "dock"', lines: "fictional first\nsecond", tab: "fictional\tmarker", types: [true, false, null, -12.5] };
+      const input = write("literal-value", { value, expectedVersion: 0 });
+      const first = await runtime.service.remember(input);
+      expect(first.current.value).toEqual(value);
+      expect(await runtime.service.remember(input)).toEqual({ ...first, duplicate: true });
+      const changed = await runtime.service.remember({ ...input, value: { ...value, note: "fictional newer" }, expectedVersion: 1, idempotencyKey: "fictional-literal-newer" });
+      await expect(runtime.service.remember({ ...input, expectedVersion: 1, idempotencyKey: "fictional-literal-stale" })).rejects.toMatchObject({ code: "VERSION_CONFLICT" });
+      const history = await runtime.service.history({ ...query, memoryId: first.current.id });
+      expect(history.events).toHaveLength(2);
+      expect(history.events.find(event => event.id === first.event.id)?.value).toEqual(value);
+      expect(history.events.find(event => event.id === changed.event.id)?.value).toEqual(changed.current.value);
+      if (!runtime.reopen) throw new Error("Conformance fixture must support reopen or replay");
+      const reopened = await runtime.reopen();
+      expect((await reopened.recall({ ...query, key: input.key })).memories[0]).toEqual(changed.current);
+      expect(await reopened.remember(input)).toEqual({ ...first, duplicate: true });
+    });
     it("separates structured listing from legacy text lookup", async () => {
       const { service, store } = await create();
       await service.remember(write("one"));

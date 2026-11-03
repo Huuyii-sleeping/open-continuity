@@ -1,7 +1,7 @@
 import { writeSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { MemoryService } from "../../src/core/memory-service.js";
-import { SqliteMemoryStore } from "../../src/sqlite/sqlite-memory-store.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
+import { SqliteMemoryStore } from "../../src/storage/sqlite/sqlite-memory-store.js";
 
 const [path, mode, index = "0"] = process.argv.slice(2);
 if (!path || !mode || !/fictional\.db$/.test(path)) throw new Error("Explicit fictional database required");

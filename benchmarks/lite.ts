@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { MemoryService } from "../src/core/memory-service.js";
-import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
+import { MemoryService } from "../src/core/application/memory-service.js";
+import { SqliteMemoryStore } from "../src/storage/sqlite/sqlite-memory-store.js";
 
 interface BenchmarkSample { operation: string; iterations: number; p50Ms: number; p95Ms: number; maxMs: number; }
 

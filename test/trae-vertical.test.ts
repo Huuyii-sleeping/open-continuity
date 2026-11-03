@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { AccessPolicy } from "../src/core/access-policy.js";
-import { MemoryService } from "../src/core/memory-service.js";
+import { AccessPolicy } from "../src/core/policy/access-policy.js";
+import { MemoryService } from "../src/core/application/memory-service.js";
 import { createMcpServer } from "../src/mcp/server.js";
-import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
+import { SqliteMemoryStore } from "../src/storage/sqlite/sqlite-memory-store.js";
 import { runInjectionHook } from "../src/injection/injection-service.js";
 import { installFakeTraeCli } from "./helpers/fake-trae.js";
 

@@ -1,0 +1,384 @@
+{
+  "version": "dense-verifier-challenge-v1",
+  "description": "Entirely fictional author-generated current-instruction-support challenge pool, frozen before this turn model scores; not independent blind evaluation. Positive requests support a stored instruction; negatives explicitly reverse or quote it, or lack any evidence. Veto semantics are not universal question relevance. No thresholds fitted on this pool.",
+  "corpus": [
+    {
+      "id": "copy",
+      "text": "虚构松塔项目每次调整配置前都保留一个恢复副本。"
+    },
+    {
+      "id": "permission",
+      "text": "虚构松塔项目只有得到用户批准才会保存长期资料。"
+    },
+    {
+      "id": "offline",
+      "text": "虚构苔原服务默认在个人电脑上离线运行。"
+    },
+    {
+      "id": "rollback",
+      "text": "虚构灯塔应用若发布检查失败，就恢复前一个稳定版本。"
+    },
+    {
+      "id": "brief",
+      "text": "虚构助手汇报进度时先给简短结论。"
+    },
+    {
+      "id": "fiction",
+      "text": "解释虚构松塔设计时只使用编造的演示案例。"
+    },
+    {
+      "id": "handoff",
+      "text": "虚构任务换助手前记录进展、阻碍和后续步骤。"
+    },
+    {
+      "id": "allowlist",
+      "text": "虚构助手只能读取用户明确许可的目录。"
+    },
+    {
+      "id": "colour",
+      "text": "虚构温室用黄色标牌标记植物。"
+    },
+    {
+      "id": "meeting",
+      "text": "虚构读书会固定星期三晚举办。"
+    },
+    {
+      "id": "food",
+      "text": "虚构角色喜欢香菇面。"
+    },
+    {
+      "id": "detail",
+      "text": "虚构审计报告逐条写出完整条款。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "fresh-copy",
+      "category": "semantic",
+      "query": "改虚构松塔配置之前先备好能还原的副本",
+      "relevant": [
+        "copy"
+      ],
+      "forbidden": [
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-permission",
+      "category": "semantic",
+      "query": "虚构松塔提取资料后需先得到批准才能长期保存",
+      "relevant": [
+        "permission"
+      ],
+      "forbidden": [
+        "copy",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-offline",
+      "category": "semantic",
+      "query": "虚构苔原默认不联网并在本机处理",
+      "relevant": [
+        "offline"
+      ],
+      "forbidden": [
+        "copy",
+        "permission",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-rollback",
+      "category": "semantic",
+      "query": "虚构灯塔发布验收失败时退回稳定的旧版本",
+      "relevant": [
+        "rollback"
+      ],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-brief",
+      "category": "semantic",
+      "query": "虚构助手报告进度时先概括结论再说细节",
+      "relevant": [
+        "brief"
+      ],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-fiction",
+      "category": "semantic",
+      "query": "说明虚构松塔设计时请用杜撰的例子",
+      "relevant": [
+        "fiction"
+      ],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-handoff",
+      "category": "semantic",
+      "query": "另一个助手接虚构任务前写清进度和下一步",
+      "relevant": [
+        "handoff"
+      ],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-allowlist",
+      "category": "semantic",
+      "query": "虚构助手读取文件只限用户授权的文件夹",
+      "relevant": [
+        "allowlist"
+      ],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-reverse-copy",
+      "category": "negation",
+      "query": "虚构松塔修改配置时不要准备恢复副本",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-reverse-approval",
+      "category": "negation",
+      "query": "虚构松塔保存长期资料可以省略用户批准",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-reverse-offline",
+      "category": "negation",
+      "query": "虚构苔原默认必须把内容交给在线服务器处理",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-reverse-rollback",
+      "category": "condition",
+      "query": "虚构灯塔发布检查成功时也必须退回旧版本",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-reverse-fiction",
+      "category": "negation",
+      "query": "说明虚构松塔设计时必须用真实用户资料做例子",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-quoted-brief",
+      "category": "quoted-content",
+      "query": "“虚构助手先给简短结论”只是小说台词，不是这次的要求",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-reverse-path",
+      "category": "negation",
+      "query": "虚构助手默认可以读取用户尚未许可的目录",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    },
+    {
+      "id": "fresh-no-evidence",
+      "category": "no-evidence",
+      "query": "虚构温室的玻璃屋顶厚度是多少",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "permission",
+        "offline",
+        "rollback",
+        "brief",
+        "fiction",
+        "handoff",
+        "allowlist",
+        "colour",
+        "meeting",
+        "food",
+        "detail"
+      ]
+    }
+  ]
+}

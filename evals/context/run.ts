@@ -12,8 +12,8 @@ try {
   if (!values["report-dir"]) throw new Error("Explicit new report directory required");
   const source = resolve(values.source!), directory = resolve(values["report-dir"]);
   const evidence = sourceEvidence(source);
-  const { ContextPackBuilder } = await import(pathToFileURL(join(source, "src/core/context-pack.ts")).href) as typeof import("../../src/core/context-pack.js");
-  const { RetrievalPipeline } = await import(pathToFileURL(join(source, "src/core/retrieval.ts")).href) as typeof import("../../src/core/retrieval.js");
+  const { ContextPackBuilder } = await import(pathToFileURL(join(source, "src/core/context-pack.ts")).href) as typeof import("../../src/core/context/pack.js");
+  const { RetrievalPipeline } = await import(pathToFileURL(join(source, "src/core/retrieval.ts")).href) as typeof import("../../src/core/retrieval/pipeline.js");
   const { InMemoryStore } = await import(pathToFileURL(join(source, "src/core/memory-store.ts")).href) as typeof import("../../src/core/memory-store.js");
   const modes: ContextSelectionMode[] = ["relevance_first", "relevance_only", "legacy_weighted"];
   const rows = modes.flatMap(mode => CONTEXT_CASES.map(scenario => {

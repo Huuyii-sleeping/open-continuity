@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
-import { candidateSkip, parseCandidateSearch, type CandidateSearchInput, type CandidateSearchResult } from "../../src/core/candidate-search.js";
+import { candidateSkip, parseCandidateSearch, type CandidateSearchInput, type CandidateSearchResult } from "../../src/core/retrieval/contracts.js";
 import { recallInputSchema, type ResolvedMemory } from "../../src/shared/types.js";
 import { parseDataset } from "../baseline/dataset.js";
 import { BACKENDS, sourceEvidence, type Backend } from "../baseline/evaluator.js";

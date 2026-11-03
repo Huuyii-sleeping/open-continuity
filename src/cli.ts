@@ -30,6 +30,7 @@ import { SqliteMemoryStore } from "./sqlite/sqlite-memory-store.js";
 import { backupSqliteDatabase, inspectSqliteDatabase, restoreSqliteDatabase } from "./sqlite/maintenance.js";
 import { errorResponse, OpenContinuityError } from "./shared/errors.js";
 import { OPEN_CONTINUITY_VERSION } from "./version.js";
+import { runHandoffCommand } from "./cli/handoff.js";
 
 const args = process.argv.slice(2);
 const jsonOutput = args.includes("--json");
@@ -53,6 +54,10 @@ function help(): string {
 Usage:
   open-continuity init
   open-continuity demo
+  open-continuity handoff prepare --input <task.json> --agent <source> [--share] [--output <draft.json>]
+  open-continuity handoff review <draft.json>
+  open-continuity handoff confirm <draft.json> --agent <source> --yes --reviewed <fingerprint>
+  open-continuity handoff resume <task-id> --agent <receiver> [--private]
   open-continuity connect <trae|claude|codex> [--force]
   open-continuity disconnect <trae|claude|codex>
   open-continuity setup <trae|claude|codex> [--workspace <path>] [--force]
@@ -104,6 +109,11 @@ async function main(): Promise<void> {
   }
   if (command === "demo") {
     output(await runDemo(serverPath));
+    return;
+  }
+  if (command === "handoff") {
+    const result = await runHandoffCommand(args.slice(1), requireConfig());
+    output(jsonOutput ? result : result.text);
     return;
   }
 

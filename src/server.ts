@@ -1,6 +1,6 @@
-import { accessPolicyFromEnv } from "./core/access-policy.js";
-import { MemoryService } from "./core/memory-service.js";
-import { createStoreFromEnv } from "./core/store-factory.js";
+import { accessPolicyFromEnv } from "./core/policy/access-policy.js";
+import { MemoryService } from "./core/application/memory-service.js";
+import { createStoreFromEnv } from "./core/application/store-factory.js";
 import { buildHttpApp } from "./http/app.js";
 import { startMcpStdio } from "./mcp/server.js";
 

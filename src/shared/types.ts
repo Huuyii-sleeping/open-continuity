@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CandidateSearchResult, ScoredSearchHit } from "../core/candidate-search.js";
+import type { CandidateSearchResult, ScoredSearchHit } from "../core/retrieval/contracts.js";
 
 export const memoryKindSchema = z.enum(["user_preference", "user_fact", "task_state", "decision"]);
 export type MemoryKind = z.infer<typeof memoryKindSchema>;
@@ -7,7 +7,7 @@ export const memoryScopeSchema = z.enum(["user", "task", "agent"]);
 export type MemoryScope = z.infer<typeof memoryScopeSchema>;
 export const sensitivitySchema = z.enum(["public", "private"]);
 export type Sensitivity = z.infer<typeof sensitivitySchema>;
-export const retrievalChannelSchema = z.enum(["exact", "structured", "full_text"]);
+export const retrievalChannelSchema = z.enum(["exact", "structured", "full_text", "dense"]);
 export type RetrievalChannel = z.infer<typeof retrievalChannelSchema>;
 export const contextPurposeSchema = z.enum(["general", "coding", "research", "browser"]);
 export type ContextPurpose = z.infer<typeof contextPurposeSchema>;
@@ -159,6 +159,7 @@ export const handoffCreateInputSchema = z.object({
   blockedBy: z.array(z.string().min(1)).max(50).default([]),
   expiresAt: z.iso.datetime({ offset: true }).optional(), sensitivity: sensitivitySchema.default("public"),
   idempotencyKey: z.string().min(1), metadata: jsonMetadataSchema.default({}),
+  expectedVersion: z.number().int().min(0).optional(),
 }).superRefine((input, context) => {
   if (input.expiresAt && Date.parse(input.expiresAt) <= Date.now()) {
     context.addIssue({ code: "custom", path: ["expiresAt"], message: "expiresAt must be in the future" });
@@ -246,7 +247,7 @@ export interface RecallResult {
       omitted: Array<{ memoryId: string; assessment: FactAssessment }> } };
 }
 export interface HistoryResult { events: MemoryEvent[]; nextCursor: string | null; }
-export type ContextSelectionReason = "retrieval_exact" | "retrieval_structured" | "retrieval_full_text" | "task_scope" | "agent_scope" | "user_confirmed" | `purpose_${ContextPurpose}`;
+export type ContextSelectionReason = "retrieval_exact" | "retrieval_structured" | "retrieval_full_text" | "retrieval_dense" | "task_scope" | "agent_scope" | "user_confirmed" | `purpose_${ContextPurpose}`;
 export type ContextSelectionMode = "relevance_first" | "relevance_only" | "legacy_weighted";
 export interface ContextSelectionSignal {
   inputRank: number; exactTier: number; retrievalScore: number | null;
@@ -272,7 +273,7 @@ export interface ContextPackOmission { memoryId: string; key: string; estimatedT
 export interface ContextCoverageRequirement { id: string; query: string; memoryIds: string[]; }
 export interface ContextCoverage {
   version: "context-coverage-v1"; policy: "rank_only" | "query_coverage";
-  meaning: "lexical_query_matches_not_semantic_answerability";
+  meaning: "lexical_query_matches_not_semantic_answerability" | "candidate_query_matches_not_answerability";
   requirements: Array<{ id: string; query: string; retrievedCount: number; selectedMemoryIds: string[];
     status: "covered" | "missing"; reason: "selected_match" | "no_retrieved_match" | "context_budget" | "fact_unresolved" | "confirmation_required" | "execution_timeout" }>;
   coveredQueries: number; totalQueries: number; duplicatesRemoved: number;

@@ -1,10 +1,41 @@
 # OpenContinuity
 
+新增[准备交接、确认、接手](docs/handoff-workflow.md)：来源Agent先生成可审核草稿，用户确认精确内容后保存，接手Agent恢复既有Handoff。支持正常CLI、MCP和HTTP入口；默认不加载模型，状态变化阻止旧草稿覆盖。工程与真实模型验收[分别记录](docs/handoff-workflow-validation.md)。
+
+先看[当前状态与下一步](docs/project-status.md)：默认共享记忆/任务交接基础已实现；Embedding与重排为默认关闭的Core实验。下一阶段集中验证跨Agent任务接力的实际效果。下方增量说明保留各阶段设计与历史验收。
+
+最新[独立相关性重排](docs/retrieval-core/relevance-reranking.md)对显式 Dense 实验的前20条授权候选进行查询/正文打分，再沿用原支持验证；正常拒绝时保留原已验证结果。排序分数不代替权限、批准或事实判断。默认不加载模型，实际收益、未解决的漏召回及额外成本见[分项验收](docs/retrieval-core/relevance-reranking-validation.md)。
+
+最新[有预算的双向补召回](docs/retrieval-core/dense-rescue.md)把候选生成和最终准入分开：原命中保留，字面检索与旧 Dense 都漏掉时才验证有限窗口；首候选矛盾就停止，新增项必须双向支持且窗口内唯一。它是显式实验，默认关闭；[质量与成本](docs/retrieval-core/dense-rescue-validation.md)保留失败方案、错选和小幅收益。
+
+最新 [SQLite 字面值索引优化](docs/retrieval-core/sqlite-literal-index.md)让路径、引号等内容按原值检索，避免 JSON 转义造成漏召回和噪声。Schema 5 使用稳定整数索引指针维护 FTS，并跳过内容未变的重建；原始值、事件、版本和权限保持。SQLite 检索回执/能力新增 `lexicalIndexVersion`，升级后的评分检索游标需从第一页重启。工程、原质量集、新字面回归与写入成本分别验收。
+
+前一增量[Dense 优化与模型验证](docs/retrieval-core/embedding-optimization.md)把向量投影/缓存与候选验证拆成独立模块：同库三轮 10k 热 P95 中位数约 384→10.7ms；旧否定误召回下降，新池仍有误拒绝/错选，较强模型资源超标。默认继续关闭，冷启动与热缓存成绩分开，见[本轮分项验收](docs/retrieval-core/embedding-optimization-validation.md)。
+
+
 OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆与任务交接层。当前主线是把这套共享记忆接入 Agent 的真实对话闭环：为 CLI Agent 提供 Conversation Capture 与 Memory Injection Adapter，从 Agent 的官方可观测扩展面增量读取对话，先放入本地 Inbox，由用户选择性批准后沉淀为共享记忆，再在后续 Prompt 中注入少量相关上下文；需要更多证据时，Agent 仍可通过 MCP 主动深度查询。
 
 Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不是另一个独立产品。OpenContinuity 不修改第三方 Agent 源码，不把完整对话自动变成长期记忆，也不提供云端存储或主动上传服务。
 
 当前发布候选为 `1.1.0-beta.1`，定位是 Developer Preview：Lite 本地闭环已可验证，Team 是实现预览，Enterprise 尚未实现。
+
+[Embedding 实验接入](docs/retrieval-core/embedding-integration.md)已将本地模型、SQLite 派生索引和独立 Dense 通道接到 Recall / Context / Query；更新、删除和模型重建会使旧向量失效，模型失败回退到字面检索。**默认关闭**，不新增模型服务或 inference npm 依赖；显式 Core 实验仍需准备并校验本地模型文件。语义正例有收益，但否定误召回与 10k 线性扫描成本仍不支持默认开启。分开查看[质量、工程与容量结果](docs/retrieval-core/embedding-integration-validation.md)。
+
+当前分支已撤销人工配置同义词 / 别名实验。现有 `memory_query.subqueries` 接收调用方显式提供的子查询，内核不会自动用模型生成。
+
+[个人版 Embedding 成本与准入实验](docs/retrieval-core/embedding-refinement.md)新增未默认装配的 Dense 准入和本地模型生命周期模块；真实原型减少运行文件/内存，支持 idle 退出。新否定误召回与预设内存预算仍未通过，当前安装无需模型服务，生产 `semantic=false`，该前期实验当时尚未接入向量索引；当前显式实验见上方入口。
+
+[后续加载与文本对验证](docs/retrieval-core/embedding-hardening.md)使固定模型的本机 embedding 加载达到资源预算，并增加绑定回执的验证和流式文件校验；双模型质量/资源仍分别存在失败，未启用默认语义检索或增加生产模型依赖。
+
+[7A内部线路补全](docs/retrieval-core/phase-7a-module-routes.md)进一步分开Query召回/历史、Context装包、事实核实、引用以及存储读写/迁移。`npm run test:core:list`查看模块/线路，`npm run test:core -- --module=query --route=history`只验收该线路；完整报告分开显示失败、跳过与未验证。
+
+[7A线路收尾](docs/retrieval-core/phase-7a-route-completion.md)补齐独立选择策略、运行包装、预算后判定与存储直接契约；主要职责登记到实现/测试，报告拒绝同组零断言漏验，不把跳过当作完整验证。
+
+[7A 模块化内核](docs/retrieval-core/phase-7a-modular-kernel.md) 将召回通道、数据库 Reader、排名、事实、Context、Query、Answer 与运行保护分开实现。旧入口保留兼容，新增 `npm run check:architecture` 防止依赖再次混在一起；设计图和代码导航见 [Core README](src/core/README.md)。7A 保持原检索行为；后续显式 Embedding 实验独立记录，默认检索仍不使用向量。前后质量、性能和工程结果见 [7A 验证](docs/retrieval-core/phase-7a-validation.md)。
+
+[6A逐层失败诊断](docs/retrieval-core/phase-6a-diagnostics.md) 是离线评测工具，不改变生产检索策略。`npm run eval:diagnostics -- --report-dir=<新的目录>` 分存储、数据分区及Recall/Context/Query报告实际候选、排名、预算、事实拒绝、安全和稳定性。旧标注保持；新增固定验收题已暴露，不是独立盲测或语义增强证据。
+
+[阶段6B/6C](docs/retrieval-core/phase-6b-lexical-fallback.md) 实现SQLite有界英文单编辑拼写fallback及开关消融，仍不依赖embedding/模型。**默认关闭**：显式Core构造策略可选择，但拼写相近不等于语义相关；合法词歧义及宽探测成本不足以支持默认启用。`npm run eval:lexical -- --report-dir=<新的目录>`分别保留原题、新题、误召回、安全、稳定和1k/10k成本结果，ON失败不改标为通过。验收规则见[6C](docs/retrieval-core/phase-6c-acceptance.md)。
 
 [阶段5运行可靠性](docs/retrieval-core/phase-5-runtime-reliability.md) 增加每个MemoryService的共享单调deadline、无队列读准入及未结束读取容量保护；超时不再继续新读取，普通读返回`READ_TIMEOUT`，Query保留明确超时/abstain。默认最多16个读请求、8个未结束Store读取，满载返回`RUNTIME_BUSY`；关闭有界drain。同步SQLite仍不能硬取消，身份/scope/确认不变；真实进程恢复、持续Query和容量报告独立验证，不是断电安全、语义增强或生产SLO承诺。
 
@@ -255,7 +286,7 @@ HTTP 服务默认监听 http://127.0.0.1:8787。MCP Server 使用 stdio transpor
 
 手动配置多个客户端时，必须保持 `OPEN_CONTINUITY_USER_ID` 相同，并为每个客户端设置不同的 `OPEN_CONTINUITY_AGENT_ID`。优先使用 CLI 连接器自动生成和管理这两个身份。
 
-客户端接入后会发现九个工具：原有的 `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`，以及 `memory_handoff_create` 和 `memory_handoff_resume`。`memory_capabilities` 用于发现当前 Profile 和可用能力；`memory_context` 用于一次检索后生成 Context Pack；`memory_query` 用于有预算的多步检索。Agent 是否主动调用这些工具仍由客户端/模型的工具策略决定；Conversation Capture 是独立的显式同步/watch 入口，不依赖模型主动调用 MCP。
+客户端接入后会发现十一个工具：原有的 `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`，以及 `memory_handoff_create`、`memory_handoff_prepare`、`memory_handoff_confirm` 和 `memory_handoff_resume`。交接推荐先prepare、展示草稿、用户批准后confirm；旧create保留直接写入兼容。`memory_capabilities` 用于发现当前 Profile 和可用能力；`memory_context` 用于一次检索后生成 Context Pack；`memory_query` 用于有预算的多步检索。Agent 是否主动调用这些工具仍由客户端/模型的工具策略决定；Conversation Capture 是独立的显式同步/watch 入口，不依赖模型主动调用 MCP。
 
 ## Trae Conversation Capture（实验性）
 
@@ -281,7 +312,7 @@ Codex Adapter 通过公开的本地 `codex app-server --stdio` JSON-RPC 接口�
 
 ## Handoff Capsule
 
-用户明确说“交接一下”时，Agent 可以调用 `memory_handoff_create`，保存任务摘要、状态、关键决策、下一步、产物和阻塞项。另一个 Agent 通过 `memory_handoff_resume` 按 `taskId` 恢复最新的未过期交接包。交接包使用 task scope，不会混入其他任务，并可配置 `expiresAt`。它解决的是一次工作的可靠续接，不等同于永久用户画像。
+用户说“准备交接”时，Agent可调用 `memory_handoff_prepare` 展示摘要、状态、决策、下一步、产物与阻碍；用户核对内容/范围后，来源Agent调用 `memory_handoff_confirm` 保存原草稿。另一个Agent通过 `memory_handoff_resume` 按 `taskId` 恢复当前已确认、未过期交接包。交接包使用task scope并可配置 `expiresAt`。旧 `memory_handoff_create` 保留直接创建兼容；完整示例见[交接流程](docs/handoff-workflow.md)。
 
 ## 隐私边界
 
@@ -382,7 +413,7 @@ PostgreSQL 使用两张核心表：
 - `memories_current`：当前有效记忆，供 `memory_recall` 快速查询。
 - `memory_events`：不可变事件历史，供 `memory_history` 审计查询。
 
-当前 Team Profile 尚未启用 pgvector，语义向量检索属于下一阶段；V1.0 的 Context Pack 和 Agentic Query 仍使用确定性混合检索，不引入外部 embedding 或生成模型。
+当前 Team Profile 尚未启用 pgvector 或 Dense。SQLite 已有显式 Core Embedding 实验，见上方接入与验收入口；默认 Context Pack 和 Agentic Query 仍使用确定性混合检索，不加载 embedding 或生成模型。
 
 ## 产品分层
 

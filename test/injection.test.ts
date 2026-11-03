@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { defaultConfig, saveConfig } from "../src/cli/config.js";
 import { runInjectionHook, type InjectionRuntime } from "../src/injection/injection-service.js";
 import type { ContextPackResult } from "../src/shared/types.js";
-import { MemoryService } from "../src/core/memory-service.js";
-import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
+import { MemoryService } from "../src/core/application/memory-service.js";
+import { SqliteMemoryStore } from "../src/storage/sqlite/sqlite-memory-store.js";
 import { renderMemoryContext } from "../src/injection/context-envelope.js";
 import { ClaudeInjectionAdapter } from "../src/injection/claude-hook-config.js";
 

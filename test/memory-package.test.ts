@@ -2,9 +2,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { MemoryService } from "../src/core/memory-service.js";
+import { MemoryService } from "../src/core/application/memory-service.js";
 import { exportMemoryPackage, importMemoryPackage } from "../src/package/memory-package.js";
-import { SqliteMemoryStore } from "../src/sqlite/sqlite-memory-store.js";
+import { SqliteMemoryStore } from "../src/storage/sqlite/sqlite-memory-store.js";
 
 describe("Memory Package", () => {
   const directories: string[] = [];

@@ -2,6 +2,11 @@
 
 这里存放完全虚构、可重复运行的效果评测，不读取用户真实历史对话。它和 `test/` 的职责不同：工程测试验证接口、权限、异常和数据一致性；评测套件验证 Capture 记忆筛选、Inbox 治理和 Injection 选择质量。
 
+
+`npm run eval:diagnostics -- --report-dir=<new-dir>`新增6A离线内核诊断：旧20题、开发8题、已暴露验收10题分区；候选/排名/Context/事实/安全/稳定/延迟及逐题缺口分开。它只记录和重放，不优化生产行为；Challenge失败保留，引用结构/权限/Required门禁独立。已暴露验收不是盲测，pg-mem不是原生PG。具体口径见[6A](../docs/retrieval-core/phase-6a-diagnostics.md)和[benchmarking](../docs/benchmarking.md)。
+
+`npm run eval:lexical -- --report-dir=<new-dir>`新增6C原38题/新16题OFF与ON分开消融及1k/10k成本原样本。工程报告完整性/安全通过不等于ON质量或默认启用通过：合法词歧义误召回及宽probe成本失败原样保存，当前策略默认OFF。固定验收不是盲测，不修改原quality/基线标签。规则与输出含义见[6C](../docs/retrieval-core/phase-6c-acceptance.md)。
+
 运行：
 
 ```bash
@@ -52,3 +57,11 @@ npm run eval:quality
 - 失败场景 ID 和安全泄露场景 ID。
 
 数据集只包含虚构项目、虚构偏好和虚构凭据占位符。扩展数据集时，应增加正例、负例、冲突偏好、跨轮证据和敏感字段覆盖，并保持 expected 标注可人工解释。新增场景必须说明期望行为，不能为了让指标通过而降低门槛。
+
+## 显式 Dense 实际接入评测
+
+`npm run eval:dense -- --provider=<本地模型模块> --output=<仓库外报告>` 对同一虚构质量集合与两组既有回归池分别测试 OFF / miss_only / hybrid；Recall、Context、Query 和索引完成状态独立报告。模型不可用或索引未完成会阻止验收，不能用缺失结果冒充质量通过。标注与冻结阈值不调整，回归池已观测、不称独立盲测。质量失败保留在报告，命令执行成功不代表语义 Challenge 通过。见[设计与复现](../docs/retrieval-core/embedding-integration.md)和[结果](../docs/retrieval-core/embedding-integration-validation.md)。
+
+`eval:dense` 的 `--verifier=<模块>` 显式增加绑定模型验证，`--dataset=<虚构集合>` 增加独立 Challenge，`--compare-ranking` 比较 Legacy 与投影缓存。每个集合从同一份实际 Core 事件账本给各臂重放，保持 ID/版本/时间戳/权限一致，结果按数据集/模式/验证配置/出口分开；预热、缓存命中和未缓存模型推理不可混为一类。新池不是独立盲测。详见[优化验收](../docs/retrieval-core/embedding-optimization-validation.md)。
+
+提交前复测补齐推理可用性门禁：Recall、Context 和 Query 的每次 Dense 调用在计分前检查，模型/验证器不可用、索引不完整或 Query 超时直接使评测失败。正常相似度/矛盾判定拒绝仍按原标注计分；生产 fail-open 行为不变。OFF 对照组不分配验证模型；虚构标注在分配模型前校验，预热或装配失败时释放已初始化资源。`npm run typecheck` 同时覆盖 Dense 评测器和命令入口。

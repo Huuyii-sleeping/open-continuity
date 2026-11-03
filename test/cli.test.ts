@@ -54,7 +54,7 @@ describe("CLI", () => {
       ok: true,
       mode: "isolated",
       transport: "MCP stdio",
-      tools: 9,
+      tools: 11,
       sharedMemory: {
         key: "response_style",
         value: "Use concise summaries and list verification results.",

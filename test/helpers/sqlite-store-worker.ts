@@ -1,5 +1,5 @@
-import { MemoryService } from "../../src/core/memory-service.js";
-import { SqliteMemoryStore } from "../../src/sqlite/sqlite-memory-store.js";
+import { MemoryService } from "../../src/core/application/memory-service.js";
+import { SqliteMemoryStore } from "../../src/storage/sqlite/sqlite-memory-store.js";
 
 const databasePath = process.env.OPEN_CONTINUITY_TEST_SQLITE;
 const index = process.env.OPEN_CONTINUITY_TEST_INDEX;

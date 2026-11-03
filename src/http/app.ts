@@ -1,10 +1,13 @@
+import { capabilitiesWithServiceSupport } from "../core/application/capabilities.js";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
-import { MemoryService } from "../core/memory-service.js";
-import { AccessPolicy } from "../core/access-policy.js";
+import { MemoryService } from "../core/application/memory-service.js";
+import { AccessPolicy } from "../core/policy/access-policy.js";
 import { errorResponse, normalizeError } from "../shared/errors.js";
 import { agenticQueryInputSchema, contextPackInputSchema, handoffCreateInputSchema, handoffResumeInputSchema, historyInputSchema, recallInputSchema, rememberInputSchema, type RememberInput } from "../shared/types.js";
-import { capabilitiesWithServiceSupport, developmentCapabilities, type RuntimeCapabilities } from "../core/profile.js";
+import { developmentCapabilities, type RuntimeCapabilities } from "../core/runtime/profile.js";
+import { handoffPrepareInputSchema, handoffConfirmInputSchema } from "../core/memory/handoff/review.js";
+import { renderHandoffReview } from "../core/memory/handoff/render.js";
 
 function requestApiKey(headers: Record<string, unknown>): string | undefined {
   const direct = headers["x-open-continuity-api-key"];
@@ -73,6 +76,21 @@ export function buildHttpApp(service = new MemoryService(), policy = new AccessP
       const input = handoffCreateInputSchema.parse(request.body);
       policy.authorize({ operation: "handoff_create", transport: "http", agentId: input.agentId, apiKey: requestApiKey(request.headers as Record<string, unknown>) });
       return await service.createHandoff(input);
+    } catch (error) { return reply.code(errorStatus(error)).send(errorResponse(error)); }
+  });
+  app.post("/v1/handoffs/prepare", async (request, reply) => {
+    try {
+      const input = handoffPrepareInputSchema.parse(request.body);
+      policy.authorize({ operation: "handoff_prepare", transport: "http", agentId: input.agentId, apiKey: requestApiKey(request.headers as Record<string, unknown>), includePrivate: input.includePrivate });
+      const draft = await service.prepareHandoff(input);
+      return { draft, review: renderHandoffReview(draft), status: "awaiting_user_confirmation" };
+    } catch (error) { return reply.code(errorStatus(error)).send(errorResponse(error)); }
+  });
+  app.post("/v1/handoffs/confirm", async (request, reply) => {
+    try {
+      const input = handoffConfirmInputSchema.parse(request.body);
+      policy.authorize({ operation: "handoff_confirm", transport: "http", agentId: input.agentId, apiKey: requestApiKey(request.headers as Record<string, unknown>) });
+      return await service.confirmHandoff(input);
     } catch (error) { return reply.code(errorStatus(error)).send(errorResponse(error)); }
   });
   app.get("/v1/handoffs/:taskId", async (request, reply) => {

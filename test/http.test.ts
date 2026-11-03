@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AccessPolicy } from "../src/core/access-policy.js";
-import { MemoryService } from "../src/core/memory-service.js";
+import { AccessPolicy } from "../src/core/policy/access-policy.js";
+import { MemoryService } from "../src/core/application/memory-service.js";
 import { buildHttpApp } from "../src/http/app.js";
-import { InMemoryStore } from "../src/core/memory-store.js";
+import { InMemoryStore } from "../src/storage/inmemory/store.js";
 
 describe("HTTP API", () => {
   it("returns budgeted sufficiency and only selected version citations through Query", async () => {

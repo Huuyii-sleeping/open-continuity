@@ -2,9 +2,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMcpServer } from "../src/mcp/server.js";
-import { AccessPolicy } from "../src/core/access-policy.js";
-import { MemoryService } from "../src/core/memory-service.js";
-import { InMemoryStore } from "../src/core/memory-store.js";
+import { AccessPolicy } from "../src/core/policy/access-policy.js";
+import { MemoryService } from "../src/core/application/memory-service.js";
+import { InMemoryStore } from "../src/storage/inmemory/store.js";
 
 describe("MCP server", () => {
   const connections: Array<{ client: Client; server: ReturnType<typeof createMcpServer> }> = [];
@@ -83,6 +83,8 @@ describe("MCP server", () => {
       "memory_history",
       "memory_forget",
       "memory_handoff_create",
+      "memory_handoff_prepare",
+      "memory_handoff_confirm",
       "memory_handoff_resume",
     ]);
 
@@ -132,7 +134,7 @@ describe("MCP server", () => {
   });
 
   it("binds MCP identity and supports a cross-agent handoff without model-supplied identities", async () => {
-    const service = new (await import("../src/core/memory-service.js")).MemoryService();
+    const service = new (await import("../src/core/application/memory-service.js")).MemoryService();
     const [writerTransport, writerServerTransport] = InMemoryTransport.createLinkedPair();
     const writer = new Client({ name: "writer", version: "0.1.0" });
     const writerServer = createMcpServer(service, new AccessPolicy(), undefined, { userId: "demo-user", agentId: "trae" });

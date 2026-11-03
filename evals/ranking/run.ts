@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { parseArgs } from "node:util";
-import { rankEvidence } from "../../src/core/evidence-ranking.js";
-import type { CandidateSearchResult, ScoredSearchHit } from "../../src/core/candidate-search.js";
+import { rankEvidence } from "../../src/core/retrieval/ranking.js";
+import type { CandidateSearchResult, ScoredSearchHit } from "../../src/core/retrieval/contracts.js";
 import type { ResolvedMemory, RetrievalChannel } from "../../src/shared/types.js";
 import { scoreRanking } from "../baseline/metrics.js";
 
@@ -46,7 +46,7 @@ try {
  }
  const passed=rows.filter(r=>r.variant==="default").every(r=>r.passed&&r.stable);
  const fingerprint=createHash("sha256").update(JSON.stringify(cases)).digest("hex");
- const sourceHash=createHash("sha256").update(readFileSync(new URL("../../src/core/evidence-ranking.ts",import.meta.url))).digest("hex");
+ const sourceHash=createHash("sha256").update(readFileSync(new URL("../../src/core/retrieval/ranking.ts",import.meta.url))).digest("hex");
  for(const [name,value]of Object.entries({quality:{passed,datasetFingerprint:fingerprint,sourceHash,rows:rows.filter(r=>r.variant==="default")},ablation:{rows:rows.filter(r=>r.variant!=="default"),note:"controlled evidence-layer signal isolation; not end-to-end quality or performance evidence"},stability:{rows:rows.map(r=>({id:r.id,variant:r.variant,stable:r.stable,repeats:5})),note:"same evidence repeated; database rebuild stability in public baseline"}}))writeFileSync(join(directory,`${name}.json`),JSON.stringify(value,null,2),{flag:"wx",mode:0o600});
  process.stdout.write(JSON.stringify({passed,cases:cases.length,variants:variants.length,datasetFingerprint:fingerprint,reportDirectory:directory}) + "\n");
  if(!passed)process.exitCode=1;

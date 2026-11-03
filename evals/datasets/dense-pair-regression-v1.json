@@ -1,0 +1,660 @@
+{
+  "version": "dense-pair-acceptance-v1",
+  "description": "New fictional author-generated acceptance pool, frozen before NLI/integrated outputs. Previous acceptance is now exposed regression. Not independently sourced or blind external evaluation.",
+  "corpus": [
+    {
+      "id": "copy",
+      "text": "修改虚构设备的本地设置之前，必须留下可以恢复的原文件副本。"
+    },
+    {
+      "id": "approval",
+      "text": "虚构资料只有得到用户明确批准后，才可以进入长期记忆。"
+    },
+    {
+      "id": "local",
+      "text": "虚构服务默认离线处理内容，联网功能需要用户主动开启。"
+    },
+    {
+      "id": "recover",
+      "text": "只有虚构部署的健康检查失败时，才应恢复到上一稳定版本。"
+    },
+    {
+      "id": "short",
+      "text": "虚构用户希望每次进展汇报只写两三句话。"
+    },
+    {
+      "id": "fabricated",
+      "text": "解释虚构设计时，要使用编造的样例，不能使用真实用户资料。"
+    },
+    {
+      "id": "handoff",
+      "text": "切换虚构助手之前，需要留下当前进展、未完成工作和下一步行动。"
+    },
+    {
+      "id": "paths",
+      "text": "The fictional program may only read folders the user explicitly allowed."
+    },
+    {
+      "id": "language",
+      "text": "The fictional Elm program is written in Go."
+    },
+    {
+      "id": "quote",
+      "text": "测试文本中的“不要备份”是虚构反例；实际修改配置仍然需要备份原文件。"
+    },
+    {
+      "id": "receipt",
+      "text": "虚构记忆回执保存短指纹和编号，不保存用户提示词全文。"
+    },
+    {
+      "id": "colour",
+      "text": "虚构设备采用绿色指示灯。"
+    },
+    {
+      "id": "meeting",
+      "text": "虚构研讨会安排在星期二上午十点。"
+    },
+    {
+      "id": "meal",
+      "text": "虚构角色喜欢南瓜粥。"
+    },
+    {
+      "id": "detail",
+      "text": "虚构审计报告需要逐项写出详细过程。"
+    },
+    {
+      "id": "tests",
+      "text": "虚构项目完成代码改动后应执行类型检查和完整测试。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "verify-copy",
+      "category": "semantic",
+      "query": "调整设置前先留一份可还原的文件",
+      "relevant": [
+        "copy"
+      ],
+      "forbidden": [
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-approval",
+      "category": "semantic",
+      "query": "提取的内容什么时候能永久保留",
+      "relevant": [
+        "approval"
+      ],
+      "forbidden": [
+        "copy",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-offline",
+      "category": "semantic",
+      "query": "默认是在网络服务器上还是个人电脑处理数据",
+      "relevant": [
+        "local"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-recovery",
+      "category": "conditional",
+      "query": "健康检查出错之后怎样恢复到可用版本",
+      "relevant": [
+        "recover"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-brief",
+      "category": "semantic",
+      "query": "把工作近况用简短的话讲清楚",
+      "relevant": [
+        "short"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-fake",
+      "category": "semantic",
+      "query": "能拿捏造的案例说明设计吗",
+      "relevant": [
+        "fabricated"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-switch",
+      "category": "semantic",
+      "query": "换其他助手继续工作之前要保留哪些进展",
+      "relevant": [
+        "handoff"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-folders",
+      "category": "cross_language",
+      "query": "它是否可以读取任意目录",
+      "relevant": [
+        "paths"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-go",
+      "category": "cross_language",
+      "query": "榆树程序用了哪种语言",
+      "relevant": [
+        "language"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-copy-en",
+      "category": "cross_language",
+      "query": "Keep a recoverable copy before editing the settings",
+      "relevant": [
+        "copy"
+      ],
+      "forbidden": [
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-quoted",
+      "category": "quoted",
+      "query": "测试反例写了不要备份，实际修改之前该怎么做",
+      "relevant": [
+        "quote"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-receipt",
+      "category": "semantic",
+      "query": "回执会保存用户输入的完整内容吗",
+      "relevant": [
+        "receipt"
+      ],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-neg-copy",
+      "category": "negation",
+      "query": "不要保留可恢复的设置原文件副本",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-bypass-approval",
+      "category": "negation",
+      "query": "未得到用户批准也立即将虚构资料放进长期记忆",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-default-upload",
+      "category": "negation",
+      "query": "在用户没有开启网络功能时，默认上传资料远程处理",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-success-rollback",
+      "category": "conditional",
+      "query": "部署健康检查成功时也必须回退到上一版本",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-real-data",
+      "category": "negation",
+      "query": "用真实用户资料来解释设计，不要使用编造样例",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-deny-switch",
+      "category": "negation",
+      "query": "切换助手之前不留进展也不记录任何下一步",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-unrestricted",
+      "category": "negation",
+      "query": "未经允许就读取所有项目文件夹",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-trap-quote",
+      "category": "quoted",
+      "query": "把测试里的不要备份反例当作实际操作要求",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-unknown-budget",
+      "category": "no_evidence",
+      "query": "虚构项目每月预算有多少钱",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-unknown-city",
+      "category": "no_evidence",
+      "query": "虚构用户住在哪座城市",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-unknown-serial",
+      "category": "no_evidence",
+      "query": "虚构设备的产品序列号是什么",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    },
+    {
+      "id": "verify-unknown-password",
+      "category": "no_evidence",
+      "query": "虚构账户的管理员密码是什么",
+      "relevant": [],
+      "forbidden": [
+        "copy",
+        "approval",
+        "local",
+        "recover",
+        "short",
+        "fabricated",
+        "handoff",
+        "paths",
+        "language",
+        "quote",
+        "receipt",
+        "colour",
+        "meeting",
+        "meal",
+        "detail",
+        "tests"
+      ]
+    }
+  ]
+}
