@@ -1,578 +1,166 @@
 # OpenContinuity
 
-新增[准备交接、确认、接手](docs/handoff-workflow.md)：来源Agent先生成可审核草稿，用户确认精确内容后保存，接手Agent恢复既有Handoff。支持正常CLI、MCP和HTTP入口；默认不加载模型，状态变化阻止旧草稿覆盖。工程与真实模型验收[分别记录](docs/handoff-workflow-validation.md)。
+[![CI](https://github.com/Huuyii-sleeping/open-continuity/actions/workflows/ci.yml/badge.svg)](https://github.com/Huuyii-sleeping/open-continuity/actions/workflows/ci.yml)
+[MIT](LICENSE) · Node.js 22.13+ · Developer Preview
 
-先看[当前状态与下一步](docs/project-status.md)：默认共享记忆/任务交接基础已实现；Embedding与重排为默认关闭的Core实验。下一阶段集中验证跨Agent任务接力的实际效果。下方增量说明保留各阶段设计与历史验收。
+**本地优先、用户可控的跨 Agent 共享记忆与任务交接层。**
 
-[后续迭代计划](docs/next-iterations.md)详细说明真实任务接力、Beta 使用入口、逐层召回调优、可选模型交付，以及后续记忆演化/多条证据的实施步骤、模块边界和验收指标；这些新增任务均为计划。
+在 Trae、Claude Code、Codex 之间切换时，让已确认的偏好、项目约束和任务进度仍可被检索、核对和使用。记忆默认保存在本机，用户决定哪些内容留下、共享给谁，以及何时修改或遗忘。
 
-最新[独立相关性重排](docs/retrieval-core/relevance-reranking.md)对显式 Dense 实验的前20条授权候选进行查询/正文打分，再沿用原支持验证；正常拒绝时保留原已验证结果。排序分数不代替权限、批准或事实判断。默认不加载模型，实际收益、未解决的漏召回及额外成本见[分项验收](docs/retrieval-core/relevance-reranking-validation.md)。
+[快速开始](#快速开始) · [使用指南](docs/usage.md) · [客户端兼容性](docs/compatibility.md) · [路线图](docs/next-iterations.md) · [参与贡献](#参与贡献)
 
-最新[有预算的双向补召回](docs/retrieval-core/dense-rescue.md)把候选生成和最终准入分开：原命中保留，字面检索与旧 Dense 都漏掉时才验证有限窗口；首候选矛盾就停止，新增项必须双向支持且窗口内唯一。它是显式实验，默认关闭；[质量与成本](docs/retrieval-core/dense-rescue-validation.md)保留失败方案、错选和小幅收益。
+## 可以用来做什么
 
-最新 [SQLite 字面值索引优化](docs/retrieval-core/sqlite-literal-index.md)让路径、引号等内容按原值检索，避免 JSON 转义造成漏召回和噪声。Schema 5 使用稳定整数索引指针维护 FTS，并跳过内容未变的重建；原始值、事件、版本和权限保持。SQLite 检索回执/能力新增 `lexicalIndexVersion`，升级后的评分检索游标需从第一页重启。工程、原质量集、新字面回归与写入成本分别验收。
+- **共享偏好和约束**：在一个 Agent 中明确保存回答风格、项目约定，换到另一个 Agent 后按需查询。
+- **从对话中选择记忆**：可观测对话先进入本地 Inbox，提取为待审核候选，用户批准后才进入长期记忆。
+- **交接正在进行的任务**：准备摘要、决策、已完成内容、阻碍和下一步，审核确认后由接手 Agent 恢复。
+- **管理记忆生命周期**：查看来源和版本历史，更新、遗忘、备份或导出自己的记忆。
 
-前一增量[Dense 优化与模型验证](docs/retrieval-core/embedding-optimization.md)把向量投影/缓存与候选验证拆成独立模块：同库三轮 10k 热 P95 中位数约 384→10.7ms；旧否定误召回下降，新池仍有误拒绝/错选，较强模型资源超标。默认继续关闭，冷启动与热缓存成绩分开，见[本轮分项验收](docs/retrieval-core/embedding-optimization-validation.md)。
-
-
-OpenContinuity 是一个 local-first、用户可控的跨 Agent 共享记忆与任务交接层。当前主线是把这套共享记忆接入 Agent 的真实对话闭环：为 CLI Agent 提供 Conversation Capture 与 Memory Injection Adapter，从 Agent 的官方可观测扩展面增量读取对话，先放入本地 Inbox，由用户选择性批准后沉淀为共享记忆，再在后续 Prompt 中注入少量相关上下文；需要更多证据时，Agent 仍可通过 MCP 主动深度查询。
-
-Conversation Capture 与 Injection 是共享记忆的适配入口和出口，不是另一个独立产品。OpenContinuity 不修改第三方 Agent 源码，不把完整对话自动变成长期记忆，也不提供云端存储或主动上传服务。
-
-当前发布候选为 `1.1.0-beta.1`，定位是 Developer Preview：Lite 本地闭环已可验证，Team 是实现预览，Enterprise 尚未实现。
-
-[Embedding 实验接入](docs/retrieval-core/embedding-integration.md)已将本地模型、SQLite 派生索引和独立 Dense 通道接到 Recall / Context / Query；更新、删除和模型重建会使旧向量失效，模型失败回退到字面检索。**默认关闭**，不新增模型服务或 inference npm 依赖；显式 Core 实验仍需准备并校验本地模型文件。语义正例有收益，但否定误召回与 10k 线性扫描成本仍不支持默认开启。分开查看[质量、工程与容量结果](docs/retrieval-core/embedding-integration-validation.md)。
-
-当前分支已撤销人工配置同义词 / 别名实验。现有 `memory_query.subqueries` 接收调用方显式提供的子查询，内核不会自动用模型生成。
-
-[个人版 Embedding 成本与准入实验](docs/retrieval-core/embedding-refinement.md)新增未默认装配的 Dense 准入和本地模型生命周期模块；真实原型减少运行文件/内存，支持 idle 退出。新否定误召回与预设内存预算仍未通过，当前安装无需模型服务，生产 `semantic=false`，该前期实验当时尚未接入向量索引；当前显式实验见上方入口。
-
-[后续加载与文本对验证](docs/retrieval-core/embedding-hardening.md)使固定模型的本机 embedding 加载达到资源预算，并增加绑定回执的验证和流式文件校验；双模型质量/资源仍分别存在失败，未启用默认语义检索或增加生产模型依赖。
-
-[7A内部线路补全](docs/retrieval-core/phase-7a-module-routes.md)进一步分开Query召回/历史、Context装包、事实核实、引用以及存储读写/迁移。`npm run test:core:list`查看模块/线路，`npm run test:core -- --module=query --route=history`只验收该线路；完整报告分开显示失败、跳过与未验证。
-
-[7A线路收尾](docs/retrieval-core/phase-7a-route-completion.md)补齐独立选择策略、运行包装、预算后判定与存储直接契约；主要职责登记到实现/测试，报告拒绝同组零断言漏验，不把跳过当作完整验证。
-
-[7A 模块化内核](docs/retrieval-core/phase-7a-modular-kernel.md) 将召回通道、数据库 Reader、排名、事实、Context、Query、Answer 与运行保护分开实现。旧入口保留兼容，新增 `npm run check:architecture` 防止依赖再次混在一起；设计图和代码导航见 [Core README](src/core/README.md)。7A 保持原检索行为；后续显式 Embedding 实验独立记录，默认检索仍不使用向量。前后质量、性能和工程结果见 [7A 验证](docs/retrieval-core/phase-7a-validation.md)。
-
-[6A逐层失败诊断](docs/retrieval-core/phase-6a-diagnostics.md) 是离线评测工具，不改变生产检索策略。`npm run eval:diagnostics -- --report-dir=<新的目录>` 分存储、数据分区及Recall/Context/Query报告实际候选、排名、预算、事实拒绝、安全和稳定性。旧标注保持；新增固定验收题已暴露，不是独立盲测或语义增强证据。
-
-[阶段6B/6C](docs/retrieval-core/phase-6b-lexical-fallback.md) 实现SQLite有界英文单编辑拼写fallback及开关消融，仍不依赖embedding/模型。**默认关闭**：显式Core构造策略可选择，但拼写相近不等于语义相关；合法词歧义及宽探测成本不足以支持默认启用。`npm run eval:lexical -- --report-dir=<新的目录>`分别保留原题、新题、误召回、安全、稳定和1k/10k成本结果，ON失败不改标为通过。验收规则见[6C](docs/retrieval-core/phase-6c-acceptance.md)。
-
-[阶段5运行可靠性](docs/retrieval-core/phase-5-runtime-reliability.md) 增加每个MemoryService的共享单调deadline、无队列读准入及未结束读取容量保护；超时不再继续新读取，普通读返回`READ_TIMEOUT`，Query保留明确超时/abstain。默认最多16个读请求、8个未结束Store读取，满载返回`RUNTIME_BUSY`；关闭有界drain。同步SQLite仍不能硬取消，身份/scope/确认不变；真实进程恢复、持续Query和容量报告独立验证，不是断电安全、语义增强或生产SLO承诺。
-
-[阶段4 Context与证据答复](docs/retrieval-core/phase-4-context-and-answer.md) 已实现确定性4A–4C范围：相关性优先选择、Query预算内覆盖、预算后充分性，以及带确切版本引用的原值结构化`answer`。`memory_query.sufficiency`现在依据实际Context，旧召回口径保留在`retrievalSufficiency`；无可用正文时`answer.status=abstain`。`evidence_ready`只表示字面匹配证据契约就绪，不表示语义上已回答；无外部模型、自由文本总结或客观真伪认证，历史仍为审计元数据。
-
-[4A 上下文选择](docs/retrieval-core/phase-4a-context-selection.md) 使用 `context-selection-v2`：默认 Exact 层级与检索分数优先，用途只在完全同分时破平，scope/用户确认不加相关性分。Core 可显式配置 `relevance_only` 消融或 `legacy_weighted` 旧排序兼容。普通Context仍按该顺序与原预算装包；多查询Query由4B覆盖优先装包，可明确改变消费顺序以保留不同子问题的证据。默认顺序及 `priority` 单位有变化，详见[兼容性](docs/compatibility.md)。
-
-内核按阶段推进；[可执行基线与独立报告](docs/retrieval-core/baseline-framework.md) 分开展示召回、Context、安全、稳定性、容量性能和工程验证。运行 `npm run eval:baseline -- --report-dir=/tmp/core-baseline-run --capacity`；报告保留失败样例与未验证项，不提供综合总分。
-
-阶段 1 引入独立的结构化存储契约，统一幂等、版本、对象副本与游标过滤绑定；参见 [存储阶段实现与验收](docs/retrieval-core/phase-1-storage.md)。普通 Recall/History 的旧游标需从第一页重新开始。
-
-[阶段 2](docs/retrieval-core/phase-2-candidates.md) 建立 `CandidateRetrieval` / `searchCandidates`：Exact、Structured、Lexical 独立返回候选与匹配证据；SQLite 使用原生 BM25 和确定性短查询 fallback，其它存储如实保留 substring 兼容能力。
-
-[阶段 3 首个增量](docs/retrieval-core/phase-3-ranking.md) 已将四个内置存储的候选接入公共 Recall、Context、Query。单通道保留原生顺序，多通道融合真实排名；精确 key 优先，结构化资格贡献为 0。回执保留原始分数、排名、融合贡献和选择原因；排序版本与策略绑定检索游标，旧查询游标需重启。当前版本链与混合快照校验已覆盖，未声明关系的跨 key 事实冲突仍为 challenge。阶段3交付时的Context加权由4A独立策略接管，预算不变；无 embedding、模型或新 Adapter。结果见[历史验证](docs/retrieval-core/phase-3-validation.md)。
-
-[3C 显式事实裁决](docs/retrieval-core/phase-3c-fact-design.md) 在上述排名之后核实调用方声明的事实组、有效期与精确替代版本。声明需要 `userConfirmed` 与 `expectedVersion`；冲突、引用未核实或组被截断时省略并返回 `factReview`，不按更新时间猜赢家，也不把不匹配 query 的替代者补成答案。旧记忆无声明时保持兼容且标记未验证；原跨 key 语义 challenge 不改标注。SQL 自动迁移新增事实列/组索引；升级前必须备份，早期运行时可能打开新版数据库却忽略事实字段，不得用于升级后的数据库。含声明的 JSON ledger v2、Memory Package 1.1 也不能交给旧读取器，详见[兼容性](docs/compatibility.md)。
-
-[2C 验收记录](docs/retrieval-core/phase-2c-validation.md) 分开记录同源码读路径对照、BM25 消融、安全、稳定性、性能成本与工程检查。v2 候选报告支持 `--compare` 逐题校验；原标注与失败样例保留，无综合总分或生产 SLO 承诺。
-
-最新 [1B 写入/恢复](docs/retrieval-core/phase-1b-writes.md) 与 [1C 分页/权限](docs/retrieval-core/phase-1c-pagination.md) 分开查看。可显式运行 `npm run test:storage:postgres:docker`，在一次性本地 PostgreSQL 中验证原生事务/CAS/幂等；不读取现有数据库，不增加默认运行依赖。真实存储测试通过不代表实现了语义检索或完成 Team 发布验收。
+## 工作方式
 
 ```mermaid
 flowchart LR
-  subgraph C[Agent clients]
-    A[Agent A]
-    B[Agent B]
-    D[Agent C]
-  end
-
-  subgraph O[OpenContinuity]
-    X[MCP / HTTP / CLI]
-    P[Identity · scope · policy]
-    W[Remember · evolve · audit]
-    R[Recall · context · bounded query]
-    H[Handoff Capsule]
-  end
-
-  subgraph S[Storage Profiles]
-    L[Lite · SQLite]
-    T[Team · PostgreSQL]
-  end
-
-  A & B & D --> X
-  X --> P
-  P --> W
-  P --> R
-  P --> H
-  W --> L & T
-  R --> L & T
-  H --> L & T
+  A[Agent A 的可观测对话] --> I[本地 Inbox 与候选]
+  I --> U[用户审核]
+  U --> M[长期共享记忆<br/>SQLite]
+  M --> R[轻量注入 / MCP 查询]
+  R --> B[Agent B 获得上下文]
 ```
 
-## 当前主线：让共享记忆进入 Agent 的真实对话闭环
+Capture 与 Injection 使用客户端公开的扩展面。MCP 也提供直接记忆写入和准备、确认、恢复交接的入口；调用方须真实传达用户授权。MCP 工具是否被调用、上下文是否被正确采用，由客户端和模型的工具策略决定。
 
-项目重点已经从“先做一个通用的共享记忆/RAG 服务”收敛为一条可验证、可迁移的 Adapter 链路：
+## 当前能力
 
-```text
-第三方 Agent 对话
-      |
-      v
-Capture Adapter（Trae app-server / Claude Stop transcript / Codex app-server）
-      |
-      v
-本地 Conversation Inbox（短期、可过期、可脱敏）
-      |
-      v
-候选提取 -> 用户批准/拒绝
-      |
-      v
-长期共享记忆（结构化、可审计、可撤销）
-      |
-      +--> Injection Adapter：下一轮 Prompt 的轻量上下文
-      |
-      +--> MCP：Agent 按需进行深度检索或任务交接
-```
-
-这条链路解决的是“共享记忆如何在不修改 Agent 源码的情况下被可靠地产生、筛选和使用”，而不是“把所有聊天记录做成一个向量库”。
-
-## 为什么它不只是 RAG
-
-RAG、全文检索和 Agentic Retrieval 解决“如何找到内容”；OpenContinuity 还解决：
-
-- **谁的记忆**：稳定用户身份和独立 Agent 身份。
-- **谁能看到**：user、task、agent scope 以及 private 策略。
-- **如何演化**：版本、CAS、幂等写入、来源和不可变事件历史。
-- **如何交接**：结构化 Handoff Capsule，而不是复制整段对话。
-- **如何带走**：带校验摘要、与具体数据库解耦的 Memory Package。
-- **如何撤销**：查看、审计、遗忘、备份和恢复由用户控制。
-
-支持四类结构化记忆：`user_preference`、`user_fact`、`task_state` 和 `decision`。Trae、Claude Code 与 Codex CLI 已有独立的实验性 Capture/Injection Adapter：它们从各自公开扩展面读取可观测会话，先放入本地 Inbox，再提取待确认候选；只有用户显式批准的候选才会进入长期共享记忆。共享记忆层也仍可被其他支持 MCP 的 Agent 直接使用。
-
-## 当前可验证能力
-
-| 能力 | 当前证据 |
+| 能力 | 状态 |
 | --- | --- |
-| Trae Adapter 闭环 | 真实 app-server 只读探针、虚构进程级 Capture→审核→Hook→MCP 黑盒，以及纵向 E2E |
-| Claude Code Adapter 闭环 | 官方 Hook/transcript 契约、虚构进程级完整黑盒；真实 Claude Code 2.1.296 已验证隔离 setup、MCP 连接和 UserPromptSubmit Hook 触发，模型支持的 Stop/Injection 内容闭环仍待有效供应商凭据 |
-| Codex Adapter 闭环 | 本机 `codex-cli 0.162.1` app-server 只读探针、虚构进程级黑盒、真实持久化 `codex exec` smoke，以及真实 `/hooks → Trust all → prompt` 交互 smoke 均通过；自动化注入断言使用单次 bypass，新 Codex 进程仍可能需要重新检查 `/hooks` |
-| 跨 Agent 共享记忆与 Handoff | `open-continuity demo` 启动两个真实 MCP stdio 客户端进行隔离验证 |
-| Lite 本地运行 | SQLite、FTS5、事务、审计历史、备份与恢复 |
-| Agent 接入 | Trae、Claude Code 与 Codex 有 Capture/Injection Adapter；其他 Agent 可继续使用 MCP/HTTP |
-| 可移植性 | Memory Package 校验、空目标导入和本地身份重绑定 |
-| 发布质量 | macOS/Linux、Node.js 22/24 CI，完整测试、审计、打包和安装后冒烟 |
-
-详细边界见[兼容性矩阵](./docs/compatibility.md)与[支持策略](./SUPPORT.md)。
-
-## 5 分钟开始使用
-
-运行环境要求 Node.js 22.13 或更高版本。正式发布后先安装到稳定路径，再连接客户端：
-
-    npm install --global open-continuity
-    open-continuity demo
-    open-continuity setup trae --workspace "$PWD"
-    open-continuity doctor trae --workspace "$PWD"
+| 本地共享记忆 | Lite 使用 SQLite，具备事务、幂等写入、版本、scope 和审计历史 |
+| 默认检索 | 独立 Exact、Structured、Full-text 通道；SQLite FTS5/BM25 排名，有预算的 Context 与多步 Query |
+| 任务交接 | CLI、MCP、HTTP 支持准备草稿 → 用户审核 → 确认 → 恢复，包含过期和并发版本检查 |
+| Agent 适配 | Trae、Claude Code、Codex 有实验性 Capture/Injection Adapter；其它支持自定义 MCP 的客户端可使用 MCP |
+| 可选语义检索 | SQLite Embedding、Dense、相关性重排和支持验证为显式 Core 实验，默认关闭 |
+| 部署 | Lite 是主要验证路径；Team/PostgreSQL 为实现预览；Enterprise 尚未实现 |
 
-Claude Code 使用对应的一键入口：
-
-    open-continuity setup claude --workspace "$PWD"
-    open-continuity doctor claude --workspace "$PWD"
-
-Codex CLI 使用对应的一键入口：
-
-    open-continuity setup codex --workspace "$PWD"
-    open-continuity doctor codex --workspace "$PWD"
-
-`connect` 会拒绝把临时 `npx` 缓存路径写入永久客户端配置；全局安装或项目内持久安装都可以。
+当前候选版本为 `1.1.0-beta.1`，处于 **Developer Preview**。建议先用虚构或可恢复的数据评估。客户端验证程度、真实模型任务接力的未验证项，以及语义实验的质量/资源限制，见[兼容性矩阵](docs/compatibility.md)、[当前状态](docs/project-status.md)和[支持策略](SUPPORT.md)。
 
-`setup trae` 是 Trae 的推荐接入入口：它会在需要时完成本地初始化，核验 Trae app-server，连接 OpenContinuity MCP，把指定 workspace 同时加入 Trae 自己的 Capture 与 Injection allowlist，备份并安装 `UserPromptSubmit` Hook，再在 macOS 安装和启动用户级 Capture 服务。命令可重复执行；只有配置或安装路径变化时才会刷新 MCP/重载服务。Setup 按 plan → apply → verify 执行；后续步骤失败时会补偿回滚本轮 MCP、Hook、配置和服务变更。非 macOS 环境会保留前台 `capture watch` 接入方式。随后运行 `doctor trae`，可以逐层检查 Capture、checkpoint、Hook、MCP 和本地数据库。Trae 不提供可脚本化的 Hook 信任状态，也不应被设置为全局免审批，因此仍需在 Trae `/hooks` 中确认 Hook，并在需要深度查询时按正常策略批准 OpenContinuity MCP 只读工具。
+## 快速开始
 
-`setup claude` 使用 Claude Code 官方用户级 Hooks：`Stop` Hook 在一轮完成后读取该会话的 transcript，`UserPromptSubmit` Hook 在下一轮注入少量已批准共享记忆；两者受 Claude Adapter 自己的 workspace allowlist 约束，不会继承 Trae 或 Codex 的授权。安装器保留已有 `settings.json` 内容并在修改前备份；若 MCP 之后的 Hook 或验证步骤失败，会恢复本轮开始前的状态。设置后需要重启正在运行的 Claude Code 会话，再用 `doctor claude` 检查 Hook、Capture 水位、MCP 和数据库。OpenContinuity 不会关闭 Claude Code 自己的 MCP 审批。
+### 1. 从源码运行
 
-`setup codex` 使用 Codex 本地 `app-server --stdio` 读取已保存线程，并在 `$CODEX_HOME/hooks.json`（通常为 `~/.codex/hooks.json`）安装官方 `Stop` 与 `UserPromptSubmit` command hooks。`Stop` 只把当前 session 的可观测回合增量同步到 Inbox；`UserPromptSubmit` 只注入已批准的 public 记忆。安装器会备份已有 hooks 配置、记录自己拥有的处理器、自动收敛旧安装路径并可幂等重跑；安全卸载不会删除用户自己的 Hook。设置后需要重启正在运行的 Codex 会话，并在 Codex `/hooks` 页面检查、信任两个 Hook。真实持久化 `codex exec` smoke 和真实交互式 `/hooks → Trust all → prompt` smoke 均已验证；自动化注入断言使用单次 `--dangerously-bypass-hook-trust`，新进程是否复用信任仍取决于 Codex 生命周期。若本机 Codex 不提供 `app-server`，请继续使用 `connect codex` 的 MCP-only 模式。
+需要 Node.js **22.13 或更高版本**和 npm。macOS/Linux 的 Node 22/24 由 CI 覆盖；Lite 无需 Docker、独立数据库服务或 Embedding 模型。
 
-`demo` 是不修改真实配置的产品证明：它会启动两个使用不同 Agent 身份的真实 MCP stdio 进程，让 Agent A 向临时 SQLite 写入记忆并创建 Handoff Capsule，关闭 Agent A 后再由 Agent B 读取记忆和恢复交接，最后自动删除临时数据库。它不要求提前执行 `init`，也不会访问 `~/.open-continuity/memories.db`。
+```bash
+git clone https://github.com/Huuyii-sleeping/open-continuity.git
+cd open-continuity
+npm ci
+npm run build
+node dist/src/cli.js demo
+```
 
-从源码体验：
+`demo` 使用完全虚构的数据和临时 SQLite，验证两个 MCP 客户端之间的记忆持久化与交接恢复，并自动清理数据库。它无需初始化或安装 Agent；这是协议演示，真实模型接手效果另行验收。
 
-    npm install
-    npm run build
-    node dist/src/cli.js demo
-    node dist/src/cli.js init
-    node dist/src/cli.js connect trae
-    node dist/src/cli.js doctor
-
-`init` 会生成一个本地用户身份并创建 `~/.open-continuity/memories.db`。不同连接器共享同一个用户身份，同时各自绑定固定 Agent 身份，因此模型不需要猜测 `userId` 或 `agentId`。`connect` 修改客户端配置前会建立备份；已有同名 MCP Server 时默认拒绝覆盖，只有显式传入 `--force` 才会替换。当前连接器支持 `trae`、`claude` 和 `codex`，详细验证状态见 [兼容性矩阵](./docs/compatibility.md)。
-
-常用管理命令：
-
-    open-continuity database check
-    open-continuity database backup --output ./memories-backup.db
-    open-continuity database restore ./memories-backup.db --yes
-    open-continuity memories list
-    open-continuity memories list --query "test runner"
-    open-continuity memories show <memory-id>
-    open-continuity memories history <memory-id>
-    open-continuity memories forget <memory-id> --yes
-    open-continuity export --output ./memory-package
-    open-continuity import ./memory-package
+目前采用源码运行方式；公开包的分发状态见[当前状态](docs/project-status.md)。以下命令均在仓库根目录执行。连接客户端后，请保留这个稳定的安装路径；全局命令安装方式见[使用指南](docs/usage.md#源码运行与本地配置)。
 
-对话候选审核流程（Trae 与 Claude 共用同一 Inbox）：
+### 2. 连接一个 Agent
 
-    open-continuity capture doctor
-    open-continuity capture sync --thread <trae-thread-id>
-    open-continuity capture thread <trae-thread-id>
-    open-continuity capture candidates
-    open-continuity capture approve <candidate-id> --share
-    open-continuity capture approve <candidate-id> --share --replace-memory <memory-id>
-    open-continuity capture reject <candidate-id>
-    open-continuity capture status --source trae
-    open-continuity capture status --source claude
-    open-continuity capture watch --once
-    open-continuity capture watch --interval 5000
-    open-continuity capture service install
-    open-continuity capture service start
-    open-continuity capture service status
-    open-continuity capture service stop
-    open-continuity capture service uninstall
+以已安装的 Codex CLI 为例，将 `/absolute/path/to/your-project` 替换为你允许访问的项目目录：
 
-本地短期数据治理：
+```bash
+node dist/src/cli.js init
+node dist/src/cli.js setup codex --workspace /absolute/path/to/your-project
+node dist/src/cli.js doctor codex --workspace /absolute/path/to/your-project
+```
 
-    open-continuity data status
-    open-continuity data cleanup
-    open-continuity data purge-transient --yes
+使用 Claude Code 或 Trae 时，将 `codex` 替换为 `claude` 或 `trae`。`setup` 会备份已有配置，并设置对应客户端的 MCP、Capture/Injection 和 workspace allowlist。安装后重启会话，按客户端要求检查 Hook 信任和 MCP 审批：Codex/Trae 需检查 `/hooks`，Claude Code 需重新加载会话设置。
 
-Trae 每轮轻量记忆注入（实验性）：
+如果只需要 MCP，可使用 `connect <agent>`；Codex 的 app-server 不可用时也可采用 MCP-only。各客户端的条件、故障排查及 Trae 后台服务说明见[使用指南](docs/usage.md#连接与客户端边界)。
 
-    open-continuity injection enable "$PWD" --agent trae
-    open-continuity injection status --json
-    open-continuity injection disable
+### 3. 审核一条对话记忆
 
-如需拆开排障或手动管理，也可以使用上面的 Capture/Injection 子命令。`injection enable <workspace> --agent <name>` 与 `capture enable <workspace> --source <name>` 只修改指定 Agent 的 allowlist；v1 配置首次读取时会自动迁移到 v2，并保留 `config.json.v1.backup`。`injection uninstall-hook --agent <name>` 只删除 OpenContinuity 记录为自己拥有的 Hook（Claude/Codex 的 Stop Hook 也会一并移除并禁用对应 Capture），不会删除其它用户处理器。推荐由 `setup trae` 负责完整接入。启用后，在 Trae 用户级 `$TRAECLI_HOME/hooks.json`（没有设置时通常是 `$HOME/.trae/hooks.json`）增加下面的 `UserPromptSubmit` command hook；把命令中的路径替换成 `injection status --json` 返回的绝对路径：
+在已授权项目中完成一次可观测对话后，查看候选：
 
-    {
-      "hooks": {
-        "UserPromptSubmit": [
-          {
-            "hooks": [
-              {
-                "type": "command",
-                "command": "node /absolute/path/to/open-continuity/dist/src/injection-hook.js",
-                "timeout": 1
-              }
-            ]
-          }
-        ]
-      }
-    }
+```bash
+node dist/src/cli.js capture candidates
+```
 
-Hook 默认关闭，且只检索已批准、`public`、当前 workspace 可见的记忆；每次最多注入 8 条、800 token 估算预算，查询超过 200ms 或发生存储错误时 fail open，不阻塞 Agent。注入内容会明确标记为不可信参考数据。审计回执只保存 Prompt 的短 SHA-256 指纹，不保存 Prompt 原文，写入 `~/.open-continuity/injection-receipts.jsonl`。可以用 `injection install-hook` 自动备份并更新 Trae 用户级 `hooks.json`，再用 `injection check-hook` 检查，Trae 内用 `/hooks` 确认；`injection disable` 会立即停止注入，但不会删除已写入回执。`capture watch` 默认以前台可中断轮询方式读取 `updatedAt` 发生变化的 thread，`--once` 用于单轮验证。每个成功导入的 thread 都会在同一 SQLite 事务内推进 durable checkpoint，记录 thread 更新时间、最后 turn、最后 item 和 item 总数；导入失败时 Inbox 与 checkpoint 一起回滚。`capture status` 和 `doctor trae` 会公开水位与恢复健康状态。
+核对内容和来源。只有认可该候选并希望同一用户的其它 Agent 使用时，才替换下方 ID 并批准共享：
 
-恢复和删除操作必须显式添加 `--yes`。恢复会写入一个新的数据库文件并原子切换本地配置，旧数据库不被覆盖；此前连接的 Agent 需要执行 `open-continuity connect <agent> --force` 并重启客户端，才能使用新库。CLI 导出只包含当前本地用户的数据；导入只接受通过校验且目标数据库为空的 Memory Package，并将来源用户身份重新绑定到当前本地用户，不会静默合并或覆盖现有记忆。
+```bash
+node dist/src/cli.js capture approve "<candidate-id>" --share
+node dist/src/cli.js memories list
+```
 
-## 源码开发
+不加 `--share` 的候选批准默认写为 private。候选来源与触发方式随客户端不同：Claude/Codex 使用 Stop Hook，Trae 使用同步/watch；没有候选时先运行对应的 `doctor`，见[候选审核](docs/usage.md#候选审核与轻量注入)。
 
-    npm install
-    npm run typecheck
-    npm test
-    npm run build
-    npm run dev
-    npm run benchmark:lite -- --memories=1000 --iterations=20
+随后可在另一个已连接 Agent 中明确要求它使用 `memory_context` 或 `memory_recall` 查询这条已确认记忆。工具调用和结果可见性仍受客户端策略及记忆 scope/private 边界约束。
 
-HTTP 服务默认监听 http://127.0.0.1:8787。MCP Server 使用 stdio transport，适合配置到支持 MCP 的 Agent 中。默认使用 Node 内置 SQLite，数据保存到 `~/.open-continuity/memories.db`，无需安装独立数据库服务；团队部署可切换到 PostgreSQL。运行环境要求 Node.js 22.13 或更高版本。
+## 任务交接
 
-准备 Developer Preview 时运行 `npm run release:check`；该命令会完成类型检查、完整测试、正式评测、生产依赖审计、包内容检查，以及从真实 tarball 隔离安装后的双 Agent MCP 演示、Claude Adapter setup/doctor 和数据治理 smoke。性能基准说明见 [Lite benchmark](./docs/benchmarking.md)，外部发布步骤和权限边界见[发布检查清单](./docs/release-checklist.md)。版本变化记录在 [CHANGELOG](./CHANGELOG.md)。
+1. 对来源 Agent 说：**“准备交接这个任务，用 `memory_handoff_prepare` 列出已完成内容、决策、阻碍和下一步，先给我审核。”**
+2. 核对草稿及 public/private 范围，再明确确认；来源 Agent 用原草稿和指纹调用 `memory_handoff_confirm`。
+3. 对接手 Agent 说：**“用 `memory_handoff_resume` 恢复任务〔任务编号〕，核对进度和阻碍后继续。”**
 
-直接启动 MCP：
+新草稿默认 private；跨 Agent 使用时需明确选择 public 并确认。目标版本已改变或草稿过期时，需要重新准备和审核。
 
-    npm run build
-    npm run start:mcp
+完整 CLI 示例、流程图和验证边界见[交接指南](docs/handoff-workflow.md)。
 
-以 Codex、Claude Code 等客户端为例，配置一个 MCP Server：
+## MCP 与 HTTP
 
-    {
-      "mcpServers": {
-        "open-continuity": {
-          "command": "node",
-            "args": ["/Users/you/personal/open-continuity/dist/src/server.js", "--mcp"],
-          "env": {
-            "OPEN_CONTINUITY_PROFILE": "lite",
-            "OPEN_CONTINUITY_STORE": "sqlite",
-            "OPEN_CONTINUITY_SQLITE_PATH": "/Users/you/.open-continuity/memories.db",
-            "OPEN_CONTINUITY_USER_ID": "local-shared-user",
-            "OPEN_CONTINUITY_AGENT_ID": "claude"
-          }
-        }
-      }
-    }
+MCP stdio 是连接 Agent 的主要入口；HTTP 默认监听 `127.0.0.1:8787`，适合本地应用集成。
 
-手动配置多个客户端时，必须保持 `OPEN_CONTINUITY_USER_ID` 相同，并为每个客户端设置不同的 `OPEN_CONTINUITY_AGENT_ID`。优先使用 CLI 连接器自动生成和管理这两个身份。
+| 工具 | 用途 |
+| --- | --- |
+| `memory_capabilities` | 查看当前 Profile 和实际配置能力 |
+| `memory_remember` / `memory_recall` | 保存用户授权的结构化记忆、检索当前记忆 |
+| `memory_context` / `memory_query` | 生成有预算的上下文、执行有预算的多步检索 |
+| `memory_history` / `memory_forget` | 查看审计历史、遗忘记忆 |
+| `memory_handoff_prepare` / `memory_handoff_confirm` / `memory_handoff_resume` | 可审核的任务交接 |
+| `memory_handoff_create` | 兼容旧客户端的直接创建交接入口 |
 
-客户端接入后会发现十一个工具：原有的 `memory_capabilities`、`memory_remember`、`memory_recall`、`memory_context`、`memory_query`、`memory_history`、`memory_forget`，以及 `memory_handoff_create`、`memory_handoff_prepare`、`memory_handoff_confirm` 和 `memory_handoff_resume`。交接推荐先prepare、展示草稿、用户批准后confirm；旧create保留直接写入兼容。`memory_capabilities` 用于发现当前 Profile 和可用能力；`memory_context` 用于一次检索后生成 Context Pack；`memory_query` 用于有预算的多步检索。Agent 是否主动调用这些工具仍由客户端/模型的工具策略决定；Conversation Capture 是独立的显式同步/watch 入口，不依赖模型主动调用 MCP。
+共 11 个工具。手动 MCP 配置、HTTP 端点、查询与更新契约见[使用指南](docs/usage.md#mcp-与-http-集成)。
 
-## Trae Conversation Capture（实验性）
+## 数据与隐私
 
-这个 Adapter 通过本机 Trae 客户端的 app-server 读取用户明确选择同步的已保存 thread。它能看到 app-server 暴露的用户消息、Agent commentary/最终回复、工具调用结果和 compact 标记，但不能获得隐藏思维链，也不代表能观测任何第三方 Agent。
+- 默认数据目录为 `~/.open-continuity/`。长期记忆、短期 Inbox 和注入回执分开保留；候选经显式审核后才进入长期记忆。
+- Capture 只处理 allowlist 内公开扩展面可观测的内容。MCP 不提供完整聊天历史，隐藏 reasoning 不持久化。
+- Injection 只使用已批准、public、workspace 可见的少量记忆，超时或存储异常时 fail open；回执保存短 Prompt 指纹，保留策略见[使用指南](docs/usage.md#数据保留与安全配置)。
+- OpenContinuity 默认不主动上传记忆。接收上下文的第三方 Agent 仍可能按其自身配置将 Prompt 发送给模型服务。
+- 身份与用户确认依赖可信调用方。当前提供本地 scope/private 策略，未实现完整多租户认证、静态数据加密或生产支持承诺。
 
-同步后的原始可观测项保存在 `~/.open-continuity/capture.db`，与长期记忆库 `memories.db` 隔离。当前规则提取器只识别“请记住”“以后”“我偏好/希望”“我们决定”等显式中英文信号，并把结果标为 private、pending 候选；普通闲聊不会直接写入长期记忆。完整回合需要同时满足 Trae 状态为 completed、存在用户消息和最终回复；中断或不完整回合会降低候选置信度。
+数据查看、备份、恢复、导入导出与清理见[使用指南](docs/usage.md#记忆管理与备份)。安全边界及漏洞报告方式见 [SECURITY.md](SECURITY.md)。
 
-不指定 `--thread` 时，`capture sync --limit 10` 会同步最近的非临时 CLI thread；更谨慎的方式是始终指定 thread ID。重复同步是幂等的。列表同步支持分页，并通过 `--limit`（每页规模）和 `--max-threads` 控制单轮扫描规模；达到上限时会报告截断。`capture watch` 适合前台运行，macOS 用户也可以用 `setup trae` 一次性注册当前用户的 `launchd` 后台服务，再用 `doctor trae` 或 `capture status` 查看服务、checkpoint 与同步健康状态。服务 start/stop/uninstall 可重复执行，停止会二次确认 launchd service 已消失，配置变化会安全重载。同步过程带单实例锁、过期锁清理和有限重试，服务日志位于 `~/.open-continuity/capture-service.log` 与 `~/.open-continuity/capture-service.error.log`。`capture thread` 用于检查 Inbox 实际读取到的规范化内容。`capture approve` 默认写为 private 长期记忆；显式添加 `--share` 才写为默认可被已连接 Agent 召回的 public 共享记忆。跨 Agent 出现完全相同的候选时会合并 evidence；候选与已有记忆高度相似但内容不同时不会自动覆盖，必须显式指定 `--replace-memory` 才创建带 `supersedes` 的新版本。当前仍未实现基于模型的语义提取和条件化偏好自动归并。
+## 文档
 
-## Claude Code Conversation Adapter（实验性）
+| 想了解什么 | 文档 |
+| --- | --- |
+| 配置、管理命令、MCP/HTTP、查询契约 | [使用指南](docs/usage.md) |
+| 准备、确认与恢复任务 | [交接指南](docs/handoff-workflow.md) |
+| 哪些客户端路径真正验证过 | [兼容性矩阵](docs/compatibility.md) |
+| 内核设计与代码组织 | [架构](docs/architecture-and-roadmap.md) · [Core 导航](src/core/README.md) |
+| 质量、安全、性能如何评测 | [评测与基准](docs/benchmarking.md) |
+| 已实现、实验和未验证内容 | [项目状态](docs/project-status.md) |
+| 接下来做什么、怎么验收 | [后续迭代计划](docs/next-iterations.md) |
+| 各次设计与历史证据 | [内核阶段索引](docs/retrieval-core/README.md) · [CHANGELOG](CHANGELOG.md) |
 
-Claude Adapter 不读取私有内部接口，而是使用 Claude Code 公开的 `UserPromptSubmit` 与 `Stop` Hook 契约。`Stop` 输入提供 `transcript_path` 和最终回复，Adapter 将 JSONL 中可观测的 user、assistant、tool 与 compaction 记录规范化后写入同一个本地 Inbox；由于 transcript 可能异步落盘，最终回复会用 Hook 的 `last_assistant_message` 补齐。OpenContinuity 自己注入的 memory context 与 meta/system reminder 会被过滤，避免形成记忆反馈循环。会话运行中切换到 allowlist 外目录的记录也会逐条跳过。
+## 开发与测试
 
-Claude Capture 由每轮 `Stop` 事件触发，不需要常驻轮询服务；Injection 则在下一轮 `UserPromptSubmit` 发生时执行。Hook 失败时保持 fail open，不阻塞 Claude。当前已通过完全虚构的进程级黑盒测试和安装后 tarball smoke；真实 Claude Code 2.1.296 还在隔离配置、虚构 workspace 和不可达本地 API 端点下验证了 setup、MCP 连接、UserPromptSubmit Hook 调用及隐私安全回执。该探针不产生模型回复，因此不能替代模型支持的 Stop Capture 和非空 Injection 闭环，后者仍需有效的 Anthropic、Bedrock、Vertex 或 Foundry 凭据。
+在完成源码安装后运行：
 
-## Codex CLI Conversation Adapter（实验性）
+```bash
+npm run typecheck
+npm run check:architecture
+npm test
+npm run eval:suite
+npm run eval:quality
+```
 
-Codex Adapter 通过公开的本地 `codex app-server --stdio` JSON-RPC 接口读取线程：先 `initialize`，再用 `thread/list` 找到线程，用 `thread/read` 和 `thread/turns/list` 读取可观测回合；优先使用分页的 `thread/turns/list`，旧版服务不可用时回退到 `thread/read { includeTurns: true }`。用户、assistant、shell/MCP 工具调用和 compaction 会规范化进入同一个 Conversation Inbox；reasoning 只保留类型标记，不保存其内容。
+内核可以按模块、线路分别测试，见 [Core 导航](src/core/README.md)。测试和评测仅使用虚构数据；发布前检查与安装包验收见[发布清单](docs/release-checklist.md)。
 
-`Stop` Hook 触发当前 session 的 Capture，`UserPromptSubmit` Hook 注入受预算限制的已批准 public 记忆。Hook 配置位于 `$CODEX_HOME/hooks.json`，写入前会备份，重复执行 `setup codex` 不会重复添加处理器。Capture 和 Injection 仍受 workspace allowlist、Inbox/长期记忆隔离和 fail-open 约束。真实本机只读探针、真实持久化 `codex exec` smoke 和真实交互式 `/hooks → Trust all → prompt` smoke 已验证 `codex-cli 0.162.1` 的初始化、线程读取、Injection 回执和 Stop checkpoint；自动化注入断言使用单次 bypass，新进程仍可能需要手动确认 `/hooks`。
+## 参与贡献
 
-效果评测使用仓库内完全虚构的数据集：`npm run eval:golden` 是快速冒烟，`npm run eval:suite` 是正式多轮门禁，`npm run eval:quality` 是语义检索挑战集。正式套件包含 18 个 Capture、13 个 Injection、6 个治理场景，每个场景独立运行 5 轮，共 185 次断言；质量集额外覆盖高相似、近重复、冲突、排序和权限边界。另有 `test/trae-vertical.test.ts` 验证 Trae Capture→审核→轻量 Injection→MCP 深搜纵向链路，不读取真实历史对话。
+欢迎通过 [Issues](https://github.com/Huuyii-sleeping/open-continuity/issues) 提交可复现的问题、兼容性报告或功能建议。大型协议和架构改动先讨论；贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)，社区约定见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
 
-## Handoff Capsule
+公开问题报告请使用虚构数据和最小复现；安全问题按 [SECURITY.md](SECURITY.md) 报告。支持范围见 [SUPPORT.md](SUPPORT.md)。
 
-用户说“准备交接”时，Agent可调用 `memory_handoff_prepare` 展示摘要、状态、决策、下一步、产物与阻碍；用户核对内容/范围后，来源Agent调用 `memory_handoff_confirm` 保存原草稿。另一个Agent通过 `memory_handoff_resume` 按 `taskId` 恢复当前已确认、未过期交接包。交接包使用task scope并可配置 `expiresAt`。旧 `memory_handoff_create` 保留直接创建兼容；完整示例见[交接流程](docs/handoff-workflow.md)。
+## 许可证
 
-## 隐私边界
-
-- Lite 默认只在本机 SQLite 中保存数据，不调用外部 embedding 或生成模型。
-- MCP 接入不会自动获得完整对话；实验性 Capture Adapter 只能读取 Agent 官方扩展面提供的可观测内容：Trae/Codex 使用本地 app-server，Claude Code 使用 Stop transcript Hook。
-- Conversation Inbox 与长期记忆隔离；候选必须显式批准才进入长期记忆。原始回合默认保留 7 天，并按回合清理与导入前过滤；pending 候选只保留提取后的 evidence，默认 30 天，不会阻止原始对话过期。
-- Injection Receipt 不保存 Prompt 原文，默认保留 30 天且最多 5000 条。`data cleanup` 执行保留策略；`data purge-transient --yes` 清空 Inbox、候选和 Receipt，但不删除长期共享记忆。
-- MCP Server 会向支持说明字段的客户端声明：不得保存凭据、秘密或完整对话。
-- private 记忆默认无法读取；启用前需要显式调整运行时策略。
-- 用户可以查看历史、删除记忆并导出完整事件链。
-
-## Runtime Profile
-
-推荐优先配置 Profile，而不是只配置存储：
-
-    OPEN_CONTINUITY_PROFILE=lite
-
-| Profile | 默认存储 | 每通道候选预算 | Context Pack 默认/最大预算 | 最多记忆数 | 当前状态 |
-| --- | --- | --- | --- | --- | --- |
-| Lite | SQLite | 50 | 1024 / 4096 tokens | 20 | 已实现 |
-| Team | PostgreSQL | 100 | 4096 / 16384 tokens | 50 | 基础版本已实现 |
-| Enterprise | 尚未固定 | 尚未固定 | 尚未固定 | 尚未固定 | 未实现，启动时明确报错 |
-
-没有设置 `OPEN_CONTINUITY_PROFILE` 时会兼容旧配置：SQLite 或 JSON 自动推导为 Lite，PostgreSQL 自动推导为 Team。显式 Profile 与 Store 冲突时会拒绝启动，例如 `team + sqlite` 或 `lite + postgres`。JSON 只能作为 Lite 的 legacy compatibility mode。
-
-Lite 启动示例：
-
-    OPEN_CONTINUITY_PROFILE=lite npm run start
-
-Team 启动示例：
-
-    OPEN_CONTINUITY_PROFILE=team \
-    OPEN_CONTINUITY_DATABASE_URL="$YOUR_POSTGRES_URL" \
-    npm run start
-
-HTTP 可通过 `GET /health` 和 `GET /v1/capabilities` 发现当前 Profile。MCP 客户端可调用 `memory_capabilities` 获取相同信息，包括存储类型、检索通道、候选预算、Context Pack 预算，以及 semantic、rerank、agentic、graph 是否可用。
-
-Agentic Query 的默认/最大预算如下：
-
-| Profile | 默认/最大步骤 | 默认/最大超时 | 最大子查询 | 历史事件预算 |
-| --- | --- | --- | --- | --- |
-| Lite | 3 / 4 | 1500 / 5000 ms | 3 | 50 |
-| Team | 5 / 8 | 3000 / 10000 ms | 8 | 100 |
-
-## 存储模式
-
-Lite 默认使用单文件 SQLite：
-
-    OPEN_CONTINUITY_STORE=sqlite
-    OPEN_CONTINUITY_SQLITE_PATH=/Users/you/.open-continuity/memories.db
-
-SQLite 启用 WAL、写入等待和事务，支持多个本机 Agent 进程共享；`query` 查询使用 FTS5 trigram 索引，两个字符以内的短查询回退为普通子串匹配。FTS 只是可重建索引，事实和历史仍保存在 `memories_current` 与 `memory_events` 两张表中。
-
-需要显式创建或升级 SQLite schema 时可以运行：
-
-    OPEN_CONTINUITY_SQLITE_PATH=/Users/you/.open-continuity/memories.db npm run db:migrate:sqlite
-
-日常维护建议先停止或重启正在连接该数据库的 Agent 客户端：
-
-    open-continuity database check
-    open-continuity database backup --output ./memories-backup.db
-    open-continuity database restore ./memories-backup.db --yes
-
-`database check` 执行 SQLite 完整性检查并报告 schema 版本、当前记忆数和事件数。备份使用 SQLite `VACUUM INTO` 产生独立、一致的数据库文件。恢复会先完整校验来源，再写入一个全新文件并原子更新本地配置；原数据库保留为回滚点，避免覆盖正在被旧 Agent 进程使用的文件。恢复结果会列出需要 `connect --force` 后重启的 Agent，`doctor` 也会把仍指向旧数据库的连接标记为未就绪。
-
-V0.4 JSON 模式继续作为显式兼容选项：
-
-    OPEN_CONTINUITY_STORE=json
-    OPEN_CONTINUITY_DATA_FILE=/Users/you/.open-continuity/memories.json
-
-从旧 JSON ledger 迁移到一个空的 SQLite 数据库：
-
-    npm run data:import-json -- \
-      --input /Users/you/.open-continuity/memories.json \
-      --database /Users/you/.open-continuity/memories.db
-
-导出 SQLite 中的完整事件历史：
-
-    npm run data:export-json -- \
-      --database /Users/you/.open-continuity/memories.db \
-      --output ./open-continuity-export.json
-
-导入命令只接受 OpenContinuity 事件 ledger，且目标数据库必须为空，因此不会静默合并或覆盖已有记忆。V0.4 升级后默认存储由 JSON 改为 SQLite；已有用户应先执行上述显式迁移，原 JSON 文件不会被自动删除或修改。
-
-PostgreSQL 模式：
-
-    OPEN_CONTINUITY_STORE=postgres
-    OPEN_CONTINUITY_DATABASE_URL="$YOUR_POSTGRES_URL"
-    OPEN_CONTINUITY_AUTO_MIGRATE=true
-    npm run start
-
-运行时默认会在启动前执行幂等迁移，并使用 PostgreSQL advisory lock 避免多个 Agent 进程首次启动时并发建表。也可以单独执行：
-
-    OPEN_CONTINUITY_DATABASE_URL="$YOUR_POSTGRES_URL" npm run db:migrate:postgres
-
-PostgreSQL 使用两张核心表：
-
-- `memories_current`：当前有效记忆，供 `memory_recall` 快速查询。
-- `memory_events`：不可变事件历史，供 `memory_history` 审计查询。
-
-当前 Team Profile 尚未启用 pgvector 或 Dense。SQLite 已有显式 Core Embedding 实验，见上方接入与验收入口；默认 Context Pack 和 Agentic Query 仍使用确定性混合检索，不加载 embedding 或生成模型。
-
-## 产品分层
-
-OpenContinuity 使用同一套记忆协议和数据语义，提供三种部署 Profile；它们不是三套互不兼容的产品。
-
-| Profile | 面向场景 | 正式存储 | 默认检索 | 状态 |
-| --- | --- | --- | --- | --- |
-| Lite | 个人、本地 Agent | SQLite | 精确匹配、结构化过滤、FTS5 全文检索 | V1.0 已实现 |
-| Team | 团队、多 Agent、多进程 | PostgreSQL + 可选 pgvector | 精确/结构化/全文融合，后续可加向量与重排 | PostgreSQL 与基础混合检索已实现，向量待实现 |
-| Enterprise | 企业、多租户与复杂知识关系 | PostgreSQL、对象存储、可选图存储 | 自适应查询规划、多路召回、图谱多跳与证据验证 | 远期计划 |
-
-JSON 会继续作为演示、调试、兼容和导入导出格式，但不会作为个人版的长期正式存储。不同 Profile 共享 MCP/HTTP 契约、Memory 数据模型、scope/权限语义和事件历史，避免接入方随部署规模增长而重写集成。标准化的 Memory Package 仍是后续能力。
-
-检索强度不只由数据量决定，还由问题复杂度、延迟预算、token 预算、隐私边界和计算成本决定。简单的偏好查询应直接命中结构化记忆；只有需要跨时间、跨实体或多跳证据的问题才进入 Agentic Retrieval。
-
-详细架构边界、差异化能力和版本验收标准见 [架构与路线图](./docs/architecture-and-roadmap.md)。
-
-## 查询契约
-
-`memory_recall` 只返回当前有效记忆，不再携带全部事件历史。支持 `key`、`kind`、`scope`、`taskId`、`query` 过滤，以及 `limit` 和不透明 `cursor` 分页；默认 20 条，最多 100 条。
-
-不传 `query` 时，响应保持 V0.5 的确定性结构化查询格式。传入 `query` 时，响应会额外包含检索回执：
-
-    {
-      "memories": [
-        {
-          "key": "response_style",
-          "retrieval": {
-            "score": 0.0327868852,
-            "channels": ["exact", "full_text"],
-            "ranks": { "exact": 1, "full_text": 1 }
-          }
-        }
-      ],
-      "nextCursor": null,
-      "retrieval": {
-        "mode": "hybrid",
-        "channels": ["exact", "full_text"],
-        "candidateCount": 1,
-        "candidateLimit": 50
-      }
-    }
-
-检索游标绑定完整查询条件，不能跨 query、用户、Agent 或 scope 复用；非法或错配游标会返回 `VALIDATION_ERROR`。回执中的 `channels` 只包含实际产生候选的通道；当前 RRF 的 `k=60`，分数用于稳定排序和解释，不代表概率或事实置信度。`candidateLimit` 是每个检索通道的候选预算，不是最终返回条数；最终返回条数仍由请求的 `limit` 控制。
-
-    {
-      "memories": [],
-      "nextCursor": null
-    }
-
-## Context Pack 契约
-
-`memory_context` 和 HTTP `POST /v1/context-pack` 在 `memory_recall` 之上完成面向消费 Agent 的二次选择。请求必须包含 `userId`、`agentId` 和非空 `query`，还可以指定 `taskId`、`purpose`、`tokenBudget` 与 `maxMemories`：
-
-    {
-      "userId": "u1",
-      "agentId": "claude",
-      "query": "open-continuity implementation",
-      "taskId": "task-42",
-      "purpose": "coding",
-      "tokenBudget": 1024,
-      "maxMemories": 10
-    }
-
-`purpose` 支持 `general`、`coding`、`research` 和 `browser`。Builder 先复用当前 Profile 的检索管线，再综合检索分数、task/agent scope、用户确认状态和 purpose 对 memory kind 的偏好进行稳定排序。响应包含：
-
-- `context`：逐行 JSON，可直接作为一段结构化上下文注入 Agent。
-- `items`：入选记忆、估算 token、排序分数和选择原因。
-- `omitted`：因 `token_budget` 或 `max_memories` 未进入上下文的完整记忆引用。
-- `budget`：请求预算、实际使用、剩余预算和估算方法。
-- `retrieval`：底层混合检索的通道和候选回执。
-
-V0.8 使用确定性的 `utf8_bytes_v1` 估算，即 UTF-8 字节数除以 4 后向上取整。它不是特定模型 tokenizer 的精确计数。为避免改变事实语义，单条记忆放不下时会整条省略，不会截断或调用模型压缩；调用方可从 `omitted` 看到原因。Context Pack 继续遵守原有 user/task/agent scope 和 private 策略，不会扩大底层检索权限。
-
-## Agentic Query 契约
-
-`memory_query` 和 HTTP `POST /v1/query` 是独立于 `memory_recall` 的增强查询入口。调用方可以只提供自然语言查询，也可以显式提供更可靠的 `subqueries`：
-
-    {
-      "userId": "u1",
-      "agentId": "claude",
-      "query": "项目技术决策的演化",
-      "strategy": "multi_step",
-      "subqueries": ["TypeScript", "Vitest"],
-      "includeHistory": true,
-      "maxSteps": 3,
-      "timeoutMs": 1000,
-      "minEvidence": 2
-    }
-
-响应包含 `plan`、逐步 `steps`、去重融合后的 `evidence`、带覆盖回执的 `contextPack`、预算后的 `sufficiency`、独立 `retrievalSufficiency`、原值/版本引用的 `answer`、实际执行预算以及 `fallback`。复杂度分为 L0-L3：L0 是显式 key，L1 是单次混合检索，L2 是多子查询或历史扩展；L3 表示需要关系或语义多跳，当前只做尽力召回并返回 `unsupported_complexity`，不会声称已经完成图谱推理。
-
-规划器是 `deterministic_v1`。显式 `subqueries` 最可靠；自动拆分只识别有限的中英文连接词。`direct` 强制只执行一次 recall，不能与 `includeHistory=true` 同用。显式子查询超过当前 Profile 上限会返回 `VALIDATION_ERROR`，自动拆分超限会截断并返回 `subquery_limit`。历史扩展按排名靠前的候选 memoryId 定向读取，最多展开 `maxSubqueries` 个候选，并共享当前 Profile 的历史事件预算；发生截断时会标记 `history_limit` 和 `history.truncated=true`。整体超时基于 `Promise.race`：结果会停止等待并确定性降级，但底层只读数据库调用无法被强制取消，其迟到结果会被忽略。
-
-`sufficiency.status`现在依据实际Context：`sufficient`表示字面子查询覆盖、最小证据及执行契约满足，不表示语义答案已正确；有部分可用证据时为`partial`，没有可用正文时为`insufficient`。旧召回口径见`retrievalSufficiency`。`answer`只投影实际入选原值，`evidence_ready/partial/abstain`配合确切版本引用；历史仍仅有审计元数据，没有生成时间线，所以答复层标partial。所有scope、task、Agent私有范围和private策略不放宽。
-
-## 记忆演化契约
-
-`memory_remember` 和 HTTP `POST /v1/memories` 继续兼容 V0.8 请求；不传演化字段时仍采用 `replace + last_write_wins`。需要防止多个 Agent 基于旧状态互相覆盖时，可以传 `expectedVersion`：
-
-    {
-      "userId": "u1",
-      "agentId": "claude",
-      "key": "coding_preferences",
-      "value": { "formatting": { "quotes": "single" } },
-      "kind": "user_preference",
-      "writeMode": "merge",
-      "expectedVersion": 1,
-      "confidence": 0.8,
-      "confidenceBasis": "source_supported",
-      "idempotencyKey": "update-42"
-    }
-
-- `expectedVersion=0` 表示仅当该逻辑 key 尚不存在时创建；大于 0 时要求当前版本完全匹配，否则返回 HTTP 409 / `VERSION_CONFLICT`。
-- `writeMode=replace` 整体替换值；`writeMode=merge` 只接受 JSON 对象并确定性深度归并。数组和标量不会智能合并。
-- 成功回执的 `evolution` 包含 `created/replaced/merged`、新版本、并发模式及 `supersedes`。
-- `confidence` 必须与 `confidenceBasis` 一起提交；依据可以是 `user_asserted`、`agent_inferred` 或 `source_supported`。`user_asserted` 还要求 `userConfirmed=true`。系统不会自行生成一个看似精确的置信度。
-- 当前记忆、历史事件和 Context Pack 都会保留 `version`、`supersedes` 与 `confidence`。历史事件同时记录归并前的输入补丁和归并后的最终值。
-
-V0.9 的 `merge` 是可复现的数据操作，不是模型自动解决语义冲突。例如“默认喜欢详细解释”和“编码时喜欢简短回答”仍应由调用方写成不同 scope/key 或条件化对象；自动冲突判断、语义归并和归并撤销仍属于后续能力。
-
-审计历史通过 `memory_history` 或 HTTP `GET /v1/memory-events` 单独查询：
-
-    {
-      "events": [],
-      "nextCursor": null
-    }
-
-scope 语义如下：
-
-- `user`：同一用户的不同 Agent 都可读取。
-- `task`：写入时必须指定 `taskId`，读取和删除时必须进入相同任务。
-- `agent`：只对创建该记忆的 Agent 可见。
-
-## 本地安全配置
-
-默认不配置 API Key，保持本地开发的零配置体验。需要限制 HTTP 调用方时，在环境变量中设置：
-
-    OPEN_CONTINUITY_API_KEY=replace-with-a-local-secret
-    OPEN_CONTINUITY_ALLOWED_AGENTS=codex,claude,glm
-    OPEN_CONTINUITY_ALLOW_PRIVATE=false
-
-HTTP 请求可以使用以下任一方式携带 API Key：
-
-    x-open-continuity-api-key: replace-with-a-local-secret
-    Authorization: Bearer replace-with-a-local-secret
-
-当配置 Agent 白名单后，`agentId` 不在白名单中的请求会返回 403。private 记忆默认不能通过接口读取；只有明确设置 `OPEN_CONTINUITY_ALLOW_PRIVATE=true` 后，调用方传 `includePrivate=true` 才会返回。
-
-HTTP 和 MCP 错误都遵循统一结构：
-
-    {
-      "error": {
-        "code": "VALIDATION_ERROR",
-        "message": "Request validation failed",
-        "details": []
-      }
-    }
-
-测试中的 MemoryService 默认使用内存存储；HTTP/MCP 运行时通过 `OPEN_CONTINUITY_STORE` 选择 SQLite、JSON 或 PostgreSQL。SQLite 是个人版默认模式；JSON ledger 保留文件锁与原子替换以兼容 V0.4；PostgreSQL 使用事务、唯一约束和索引，适合多进程和后续多实例部署。语义 planner、pgvector、图遍历、Outbox、OAuth、多租户和完整 Handoff 放在后续版本。
+[MIT](LICENSE) © Huuyii-sleeping
