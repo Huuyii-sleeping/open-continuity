@@ -4,6 +4,8 @@
 
 先看[当前状态与下一步](docs/project-status.md)：默认共享记忆/任务交接基础已实现；Embedding与重排为默认关闭的Core实验。下一阶段集中验证跨Agent任务接力的实际效果。下方增量说明保留各阶段设计与历史验收。
 
+[后续迭代计划](docs/next-iterations.md)详细说明真实任务接力、Beta 使用入口、逐层召回调优、可选模型交付，以及后续记忆演化/多条证据的实施步骤、模块边界和验收指标；这些新增任务均为计划。
+
 最新[独立相关性重排](docs/retrieval-core/relevance-reranking.md)对显式 Dense 实验的前20条授权候选进行查询/正文打分，再沿用原支持验证；正常拒绝时保留原已验证结果。排序分数不代替权限、批准或事实判断。默认不加载模型，实际收益、未解决的漏召回及额外成本见[分项验收](docs/retrieval-core/relevance-reranking-validation.md)。
 
 最新[有预算的双向补召回](docs/retrieval-core/dense-rescue.md)把候选生成和最终准入分开：原命中保留，字面检索与旧 Dense 都漏掉时才验证有限窗口；首候选矛盾就停止，新增项必须双向支持且窗口内唯一。它是显式实验，默认关闭；[质量与成本](docs/retrieval-core/dense-rescue-validation.md)保留失败方案、错选和小幅收益。
