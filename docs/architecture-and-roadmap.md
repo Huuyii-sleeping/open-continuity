@@ -2,7 +2,9 @@
 
 最新用户流程增量为[交接草稿与确认](./handoff-workflow.md)：复用既有Handoff，分开准备、用户审核、原子确认和恢复。草稿绑定精确内容/身份/目标快照，默认private；跨Agent需明确public共享。协议、CLI和持久化验收与实际模型接手效果[分开记录](./handoff-workflow-validation.md)，不改变默认Embedding策略。
 
-[当前状态与下一步（2026-10-30）](./project-status.md)把默认能力、显式语义实验、已知问题和阶段证据分开。下一阶段先验证跨Agent任务接力：复用既有Handoff，建立完整使用流程和实际接手结果的独立基线，再据失败决定内核调优。
+[当前状态与下一步（2026-11-04）](./project-status.md)把默认能力、显式语义实验、已知问题和阶段证据分开。已实现内核和交接增量通过 PR #13 合并；真实模型接手效果仍未验证。
+
+[后续迭代计划](./next-iterations.md)按真实任务接力、Beta 使用入口、逐层召回质量、可选语义交付分别列实施步骤与接受标准。先复用既有 Handoff 建立实际接手对照，再依据失败定位调优；记忆演化和多条语义证据另开增量。新入口和评测均为计划，不改变当前默认模型或 Adapter 边界。
 
 最新独立增量为[Dense相关性重排](./retrieval-core/relevance-reranking.md)：通用 `retrieval/reranking/` 管理评分模型与绑定回执，`dense/reranking/` 分开排序和最终选择，原验证线路作为可保留的基线。两阶段共用 deadline；相对相关性不决定权限或事实权威。默认关闭，质量、安全、成本与剩余失败见[独立验收](./retrieval-core/relevance-reranking-validation.md)。
 
